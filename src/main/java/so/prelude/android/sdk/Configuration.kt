@@ -24,6 +24,10 @@ data class Configuration
          * The timeout in milliseconds for the network requests.
          */
         var requestTimeout: Long = DEFAULT_REQUEST_TIMEOUT,
+        /**
+         * The maximum number of automatic retries for the network requests in case of server errors and timeouts.
+         */
+        var maxRetries: Int = DEFAULT_MAX_RETRY_COUNT,
     ) {
         /**
          * The endpoint address of the Prelude API.
@@ -39,6 +43,11 @@ data class Configuration
              * The default timeout.
              */
             const val DEFAULT_REQUEST_TIMEOUT = 2000L
+
+            /**
+             * The default automatic retry count for server errors and timeouts.
+             */
+            const val DEFAULT_MAX_RETRY_COUNT = 0
         }
     }
 
