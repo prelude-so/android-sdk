@@ -56,3 +56,13 @@ prelude.dispatchSignals((status, dispatchId) -> {
 ```
 
 This way you can continue the onboarding only when you are sure the signal dispatching is complete with the `SUCCESS` status.
+
+**Proguard**
+
+If you use minification in your application (i.e. `isMinifyEnabled = true` somewhere in your `build.gradle` file), please add the following lines to your Proguard configuration file to avoid runtime issues:
+
+```
+-dontwarn java.awt.*
+-keep class com.sun.jna.** { *; }
+-keep class * implements com.sun.jna.** { *; }
+```

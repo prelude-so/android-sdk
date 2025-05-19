@@ -31,6 +31,7 @@ import java.time.Instant
 internal suspend fun Context.dispatchSignals(
     configuration: Configuration,
     dispatchId: String,
+    signalsScope: SignalsScope,
 ): String {
     val signalsUrl: URL =
         try {
@@ -58,6 +59,7 @@ internal suspend fun Context.dispatchSignals(
             cellularNetwork = cellularNetwork,
             signalsId = signals.id,
             payload = payload,
+            signalsScope = signalsScope,
         ).awaitAll()
 
     if (results.any { it is NetworkResponse.Error }) {
@@ -89,6 +91,7 @@ private fun buildNetworkJobs(
     cellularNetwork: android.net.Network?,
     signalsId: String,
     payload: ByteArray,
+    signalsScope: SignalsScope,
 ): List<Deferred<NetworkResponse>> {
     val jobs = mutableListOf<Deferred<NetworkResponse>>()
     val sdkHeaders =
@@ -100,61 +103,64 @@ private fun buildNetworkJobs(
     when {
         lanNetwork != null && cellularNetwork != null -> {
             jobs.add(
-                lanNetwork.postRequestJob(
+                cellularNetwork.requestJob(
                     scope = scope,
                     signalsUrl = signalsUrl,
                     sdkHeaders = sdkHeaders,
                     requestTimeout = configuration.requestTimeout,
-                    payload = payload,
+                    maxRetries = configuration.maxRetries,
                 ),
             )
-
-            jobs.add(
-                cellularNetwork.optionsRequestJob(
-                    scope = scope,
-                    signalsUrl = signalsUrl,
-                    sdkHeaders = sdkHeaders,
-                    requestTimeout = configuration.requestTimeout,
-                ),
-            )
+            if (signalsScope == SignalsScope.FULL) {
+                jobs.add(
+                    lanNetwork.requestJob(
+                        scope = scope,
+                        signalsUrl = signalsUrl,
+                        sdkHeaders = sdkHeaders,
+                        requestTimeout = configuration.requestTimeout,
+                        maxRetries = configuration.maxRetries,
+                        payload = payload,
+                    ),
+                )
+            }
         }
-
         lanNetwork != null -> {
             jobs.add(
-                lanNetwork.postRequestJob(
+                lanNetwork.requestJob(
                     scope = scope,
                     signalsUrl = signalsUrl,
                     sdkHeaders = sdkHeaders,
                     requestTimeout = configuration.requestTimeout,
-                    payload = payload,
+                    maxRetries = configuration.maxRetries,
+                    payload = if (signalsScope == SignalsScope.FULL) payload else null,
                 ),
             )
         }
-
         cellularNetwork != null -> {
             jobs.add(
-                cellularNetwork.postRequestJob(
+                cellularNetwork.requestJob(
                     scope = scope,
                     signalsUrl = signalsUrl,
                     sdkHeaders = sdkHeaders,
                     requestTimeout = configuration.requestTimeout,
-                    payload = payload,
+                    maxRetries = configuration.maxRetries,
+                    payload = if (signalsScope == SignalsScope.FULL) payload else null,
                 ),
             )
         }
-
         else -> Unit
     }
 
     return jobs
 }
 
-private fun android.net.Network.postRequestJob(
+private fun android.net.Network.requestJob(
     scope: CoroutineScope,
     signalsUrl: URL,
     sdkHeaders: Map<String, String>,
     requestTimeout: Long,
-    payload: ByteArray?,
+    maxRetries: Int,
+    payload: ByteArray? = null,
 ): Deferred<NetworkResponse> =
     scope.async {
         val contentHeaders =
@@ -164,26 +170,12 @@ private fun android.net.Network.postRequestJob(
             )
         Request(
             url = signalsUrl,
-            method = "POST",
+            method = if (payload != null) "POST" else "OPTIONS",
             headers = commonHeaders + sdkHeaders + contentHeaders,
             timeout = requestTimeout,
+            maxRetries = maxRetries,
             body = payload,
-        ).send(this@postRequestJob)
-    }
-
-private fun android.net.Network.optionsRequestJob(
-    scope: CoroutineScope,
-    signalsUrl: URL,
-    sdkHeaders: Map<String, String>,
-    requestTimeout: Long,
-): Deferred<NetworkResponse> =
-    scope.async {
-        Request(
-            url = signalsUrl,
-            method = "OPTIONS",
-            headers = commonHeaders + sdkHeaders,
-            timeout = requestTimeout,
-        ).send(this@optionsRequestJob)
+        ).send(this@requestJob)
     }
 
 private fun String.toSignalsUrl(): URL = URL("$this/v1/signals")

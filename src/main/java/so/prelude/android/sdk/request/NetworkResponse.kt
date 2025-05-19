@@ -13,5 +13,6 @@ sealed class NetworkResponse(
 
     class Error(
         override val code: Int,
+        val message: String,
     ) : NetworkResponse(code)
 }

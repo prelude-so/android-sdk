@@ -4,7 +4,7 @@ import so.prelude.android.sdk.SystemInfo
 import so.prelude.android.sdk.VersionInfo
 import so.prelude.android.sdk.coreVersion
 
-private val userAgent = "Prelude/${VersionInfo.versionString} Core/${coreVersion()} (${SystemInfo.userAgentString})"
+internal val userAgent = "Prelude/${VersionInfo.versionString} Core/${coreVersion()} (${SystemInfo.userAgentString})"
 
 internal val commonHeaders =
     mapOf(
