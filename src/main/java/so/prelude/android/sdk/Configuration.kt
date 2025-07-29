@@ -1,6 +1,7 @@
 package so.prelude.android.sdk
 
 import android.content.Context
+import okhttp3.OkHttpClient
 
 /**
  * Configuration is the configuration for the Prelude SDK.
@@ -20,6 +21,10 @@ data class Configuration
          * The endpoint address of the Prelude API.
          */
         var endpoint: Endpoint = Endpoint.Default,
+        /**
+         * The list of features to be advertised as supported by the local implementation of the Prelude SDK.
+         */
+        var implementedFeatures: List<Features> = listOf(),
         /**
          * The timeout in milliseconds for the network requests.
          */
@@ -65,5 +70,19 @@ sealed class Endpoint {
      */
     data class Custom(
         val address: String,
+        val okHttpClient: OkHttpClient? = null,
     ) : Endpoint()
+}
+
+enum class Features(
+    val value: Long,
+) {
+    SilentVerification(1L shl 0),
+    ;
+
+    companion object {
+        fun fromRawValue(rawValue: Long): List<Features> = Features.entries.filter { (rawValue and it.value) != 0L }
+
+        fun List<Features>.toRawValue(): Long = fold(0L) { acc, feature -> acc or feature.value }
+    }
 }
