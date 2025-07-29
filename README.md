@@ -7,10 +7,10 @@ It is provided as a regular Maven artifact that you can use as a normal dependen
 
 ```
 (Kts)
-implementation("so.prelude.android:sdk:0.2.0")
+implementation("so.prelude.android:sdk:0.2.1")
 
 (Groovy)
-implementation 'so.prelude.android:sdk:0.2.0'
+implementation 'so.prelude.android:sdk:0.2.1'
 ```
 
 ***Important: To use the SDK you will need the SDK key that you generate in the Prelude dashboard for your account. When it is created, you will be able to copy it and it should be stored in a safe location for later use, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use.***
