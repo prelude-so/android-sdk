@@ -35,6 +35,7 @@ internal class Request(
     private val timeout: Long = 2000L, // in milliseconds
     private val includeRequestDateHeader: Boolean = true,
     private val maxRetries: Int = 0,
+    private val okHttpClient: OkHttpClient? = null,
 ) {
     suspend fun send(
         network: Network,
@@ -45,7 +46,7 @@ internal class Request(
             delay(requestDelay)
         }
 
-        val client = buildOkHttpClient(network, headers, timeout)
+        val client = okHttpClient ?: buildOkHttpClient(network, headers, timeout)
 
         val request =
             Request

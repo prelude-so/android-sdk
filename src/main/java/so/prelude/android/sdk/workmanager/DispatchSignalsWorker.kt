@@ -9,6 +9,8 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.Endpoint
+import so.prelude.android.sdk.Features
+import so.prelude.android.sdk.Features.Companion.toRawValue
 import so.prelude.android.sdk.SDKError
 import so.prelude.android.sdk.signals.SignalsScope
 import so.prelude.android.sdk.signals.dispatchSignals
@@ -29,11 +31,13 @@ internal class DispatchSignalsWorker(
             val requestTimeout = inputData.getLong(REQUEST_TIMEOUT_PARAM, Configuration.DEFAULT_REQUEST_TIMEOUT)
             val retryCount = inputData.getInt(RETRY_COUNT_PARAM, Configuration.DEFAULT_MAX_RETRY_COUNT)
             val signalsScope = inputData.getInt(SIGNALS_SCOPE_PARAM, SignalsScope.FULL.value)
+            val rawImplementedFeatures = inputData.getLong(IMPLEMENTED_FEATURES_PARAM, 0L)
             val configuration =
                 Configuration(
                     context = applicationContext,
                     sdkKey = sdkKey,
                     endpoint = customUrl?.let { Endpoint.Custom(it) } ?: Endpoint.Default,
+                    implementedFeatures = Features.fromRawValue(rawImplementedFeatures),
                     requestTimeout = requestTimeout,
                     maxRetries = retryCount,
                 )
@@ -61,6 +65,7 @@ internal class DispatchSignalsWorker(
         private const val RETRY_COUNT_PARAM = "retry_count"
         const val SDK_ERROR_MESSAGE_PARAM = "sdk_error_message"
         private const val SIGNALS_SCOPE_PARAM = "signals_scope"
+        private const val IMPLEMENTED_FEATURES_PARAM = "implemented_features"
 
         internal fun buildRequest(
             configuration: Configuration,
@@ -75,6 +80,7 @@ internal class DispatchSignalsWorker(
                     REQUEST_TIMEOUT_PARAM to configuration.requestTimeout,
                     RETRY_COUNT_PARAM to configuration.maxRetries,
                     SIGNALS_SCOPE_PARAM to signalsScope.value,
+                    IMPLEMENTED_FEATURES_PARAM to configuration.implementedFeatures.toRawValue(),
                 )
             return OneTimeWorkRequestBuilder<DispatchSignalsWorker>()
                 .setInputData(params)

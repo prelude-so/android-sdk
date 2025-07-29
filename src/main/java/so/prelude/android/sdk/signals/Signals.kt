@@ -11,6 +11,7 @@ import kotlinx.coroutines.awaitAll
 import so.prelude.android.sdk.Application
 import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.Device
+import so.prelude.android.sdk.Features.Companion.toRawValue
 import so.prelude.android.sdk.Hardware
 import so.prelude.android.sdk.Network
 import so.prelude.android.sdk.SDKError
@@ -57,7 +58,7 @@ internal suspend fun Context.dispatchSignals(
             configuration = configuration,
             lanNetwork = lanNetwork,
             cellularNetwork = cellularNetwork,
-            signalsId = signals.id,
+            dispatchId = signals.id,
             payload = payload,
             signalsScope = signalsScope,
         ).awaitAll()
@@ -89,15 +90,16 @@ private fun buildNetworkJobs(
     configuration: Configuration,
     lanNetwork: android.net.Network?,
     cellularNetwork: android.net.Network?,
-    signalsId: String,
+    dispatchId: String,
     payload: ByteArray,
     signalsScope: SignalsScope,
 ): List<Deferred<NetworkResponse>> {
     val jobs = mutableListOf<Deferred<NetworkResponse>>()
     val sdkHeaders =
         mapOf(
-            "X-SDK-DispatchID" to signalsId,
+            "X-SDK-DispatchID" to dispatchId,
             "X-SDK-Key" to configuration.sdkKey,
+            "X-SDK-Implemented-Features" to configuration.implementedFeatures.toRawValue().toString(),
         )
 
     when {
