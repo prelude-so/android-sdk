@@ -1,21 +1,16 @@
 package so.prelude.android.sdk
 
 import android.content.Context
-import androidx.work.WorkInfo
-import androidx.work.WorkManager
+import android.util.Log
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import so.prelude.android.sdk.DispatchStatusListener.Status
 import so.prelude.android.sdk.signals.SignalsScope
+import so.prelude.android.sdk.signals.dispatchSignals
 import so.prelude.android.sdk.support.sdkInternalScope
 import so.prelude.android.sdk.verification.VerificationListener
 import so.prelude.android.sdk.verification.performSilentVerification
-import so.prelude.android.sdk.workmanager.DispatchSignalsWorker
 import java.net.URL
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -45,73 +40,46 @@ data class Prelude(
         signalsScope: SignalsScope = SignalsScope.FULL,
         dispatchStatusListener: DispatchStatusListener? = null,
     ): String {
-        val dispatchId = dispatchId()
-        val dispatchRequest =
-            DispatchSignalsWorker.buildRequest(
-                configuration = configuration,
-                dispatchId = dispatchId,
-                signalsScope = signalsScope,
-            )
-        val wm = WorkManager.getInstance(configuration.context)
-
-        if (dispatchStatusListener != null) {
-            sdkInternalScope.launch {
-                wm
-                    .getWorkInfoByIdFlow(dispatchRequest.id)
-                    .filterNotNull()
-                    .collectLatest {
-                        when (it.state) {
-                            WorkInfo.State.ENQUEUED -> Unit
-                            WorkInfo.State.RUNNING -> dispatchStatusListener.onStatus(Status.STARTED, dispatchId)
-                            WorkInfo.State.SUCCEEDED -> dispatchStatusListener.onStatus(Status.SUCCESS, dispatchId)
-                            WorkInfo.State.FAILED -> dispatchStatusListener.onStatus(Status.FAILURE, dispatchId)
-                            WorkInfo.State.BLOCKED -> dispatchStatusListener.onStatus(Status.FAILURE, dispatchId)
-                            WorkInfo.State.CANCELLED -> dispatchStatusListener.onStatus(Status.FAILURE, dispatchId)
-                        }
-                    }
+        sdkInternalScope.launch {
+            try {
+                val dispatchId =
+                    dispatchSignals(
+                        configuration = configuration,
+                        signalsScope = signalsScope,
+                    )
+                dispatchStatusListener?.onStatus(Status.SUCCESS, dispatchId)
+            } catch (e: Exception) {
+                Log.e("Prelude", "Dispatch failed: ${e.message}")
+                dispatchStatusListener?.onStatus(Status.FAILURE, "")
             }
         }
 
-        wm.enqueue(dispatchRequest)
-
-        return dispatchId
+        return ""
     }
 
-    fun dispatchSignalsFlow(signalsScope: SignalsScope = SignalsScope.FULL): Flow<DispatchProgress> {
-        val dispatchId = dispatchId()
-        val dispatchRequest =
-            DispatchSignalsWorker.buildRequest(
-                configuration = configuration,
-                dispatchId = dispatchId,
-                signalsScope = signalsScope,
-            )
-        val wm = WorkManager.getInstance(configuration.context)
-
-        return wm
-            .getWorkInfoByIdFlow(dispatchRequest.id)
-            .filterNotNull()
-            .map {
-                when (it.state) {
-                    WorkInfo.State.ENQUEUED -> DispatchProgress(dispatchId, Status.STARTED)
-                    WorkInfo.State.RUNNING -> DispatchProgress(dispatchId, Status.STARTED)
-                    WorkInfo.State.SUCCEEDED -> DispatchProgress(dispatchId, Status.SUCCESS)
-                    WorkInfo.State.FAILED -> DispatchProgress(dispatchId, Status.FAILURE)
-                    WorkInfo.State.BLOCKED -> DispatchProgress(dispatchId, Status.FAILURE)
-                    WorkInfo.State.CANCELLED -> DispatchProgress(dispatchId, Status.FAILURE)
-                }
-            }.onStart { wm.enqueue(dispatchRequest) }
-    }
+    fun dispatchSignalsFlow(signalsScope: SignalsScope = SignalsScope.FULL): Flow<DispatchProgress> =
+        flow {
+            try {
+                val dispatchId =
+                    dispatchSignals(
+                        configuration = configuration,
+                        signalsScope = signalsScope,
+                    )
+                emit(DispatchProgress(dispatchId, Status.SUCCESS))
+            } catch (e: Exception) {
+                Log.e("Prelude", "Dispatch failed: ${e.message}")
+                emit(DispatchProgress("", Status.FAILURE))
+            }
+        }
 
     suspend fun dispatchSignals(signalsScope: SignalsScope = SignalsScope.FULL): Result<String> =
         try {
-            val progress =
-                dispatchSignalsFlow(signalsScope = signalsScope)
-                    .first { it.status == Status.SUCCESS || it.status == Status.FAILURE }
-
-            when (progress.status) {
-                Status.SUCCESS -> Result.success(progress.dispatchId)
-                else -> Result.failure(Exception("Dispatch failed"))
-            }
+            val dispatchId =
+                dispatchSignals(
+                    configuration = configuration,
+                    signalsScope = signalsScope,
+                )
+            Result.success(dispatchId)
         } catch (e: Exception) {
             Result.failure(e)
         }
