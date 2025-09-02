@@ -27,6 +27,7 @@ internal suspend fun performSilentVerification(
                     "User-Agent" to userAgent,
                 ),
             includeRequestDateHeader = false,
+            vpnEnabled = false,
         )
 
     val cellular = configuration.context.getCellular()

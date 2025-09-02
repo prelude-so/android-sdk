@@ -10,6 +10,7 @@ import okhttp3.ResponseBody
 import okio.IOException
 import so.prelude.android.sdk.request.NetworkResponse.Error
 import so.prelude.android.sdk.request.NetworkResponse.Success
+import java.net.Proxy
 import java.net.SocketTimeoutException
 import java.net.URL
 import java.time.ZoneOffset
@@ -36,6 +37,7 @@ internal class Request(
     private val includeRequestDateHeader: Boolean = true,
     private val maxRetries: Int = 0,
     private val okHttpClient: OkHttpClient? = null,
+    private val vpnEnabled: Boolean,
 ) {
     suspend fun send(
         network: Network,
@@ -46,7 +48,7 @@ internal class Request(
             delay(requestDelay)
         }
 
-        val client = okHttpClient ?: buildOkHttpClient(network, headers, timeout)
+        val client = okHttpClient ?: buildOkHttpClient(network, headers, timeout, vpnEnabled)
 
         val request =
             Request
@@ -67,12 +69,13 @@ internal class Request(
         network: Network,
         headers: Map<String, String>,
         timeout: Long,
+        usingVpn: Boolean,
     ): OkHttpClient {
         val clientBuilder =
             OkHttpClient
                 .Builder()
                 .connectTimeout(timeout, MILLISECONDS)
-                .socketFactory(network.socketFactory)
+                .proxy(Proxy.NO_PROXY)
                 .addNetworkInterceptor { chain ->
                     val builder = chain.request().newBuilder()
 
@@ -89,6 +92,11 @@ internal class Request(
 
                     chain.proceed(builder.build())
                 }
+
+        // Use the default socket factory for VPN requests, bind to the network for non-VPN requests.
+        if (!usingVpn) {
+            clientBuilder.socketFactory(network.socketFactory)
+        }
 
         return clientBuilder.build()
     }
