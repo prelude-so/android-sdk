@@ -16,6 +16,7 @@ import so.prelude.android.sdk.Hardware
 import so.prelude.android.sdk.Network
 import so.prelude.android.sdk.SDKError
 import so.prelude.android.sdk.Signals
+import so.prelude.android.sdk.dispatchId
 import so.prelude.android.sdk.generatePayload
 import so.prelude.android.sdk.network.getCellular
 import so.prelude.android.sdk.network.getLan
@@ -29,9 +30,8 @@ import so.prelude.android.sdk.support.toHexString
 import java.net.URL
 import java.time.Instant
 
-internal suspend fun Context.dispatchSignals(
+internal suspend fun dispatchSignals(
     configuration: Configuration,
-    dispatchId: String,
     signalsScope: SignalsScope,
 ): String {
     val signalsUrl: URL =
@@ -41,15 +41,15 @@ internal suspend fun Context.dispatchSignals(
             throw SDKError.ConfigurationError("cannot parse dispatch URL: ${e.message}")
         }
 
-    val lanNetwork = getLan()
-    val cellularNetwork = getCellular()
+    val context = configuration.context.applicationContext
+    val lanNetwork = context.getLan()
+    val cellularNetwork = context.getCellular()
 
     if (lanNetwork == null && cellularNetwork == null) {
         throw SDKError.SystemError("No valid network transports available. A LAN or cellular network is required.")
     }
 
-    val signals = Signals.collect(this, dispatchId)
-    val payload = generatePayload(signals, getSignaturesList().firstOrNull())
+    val signals = Signals.collect(context)
 
     val results =
         buildNetworkJobs(
@@ -58,8 +58,7 @@ internal suspend fun Context.dispatchSignals(
             configuration = configuration,
             lanNetwork = lanNetwork,
             cellularNetwork = cellularNetwork,
-            dispatchId = signals.id,
-            payload = payload,
+            signals = signals,
             signalsScope = signalsScope,
         ).awaitAll()
 
@@ -69,13 +68,10 @@ internal suspend fun Context.dispatchSignals(
     return signals.id
 }
 
-private fun Signals.Companion.collect(
-    context: Context,
-    dispatchId: String,
-): Signals =
+private fun Signals.Companion.collect(context: Context): Signals =
     with(context.applicationContext) {
         Signals(
-            dispatchId,
+            dispatchId(),
             Instant.now(),
             Application.collect(this),
             Device.collect(this),
@@ -90,11 +86,15 @@ private fun buildNetworkJobs(
     configuration: Configuration,
     lanNetwork: android.net.Network?,
     cellularNetwork: android.net.Network?,
-    dispatchId: String,
-    payload: ByteArray,
+    signals: Signals,
     signalsScope: SignalsScope,
 ): List<Deferred<NetworkResponse>> {
+    val context = configuration.context.applicationContext
+    val dispatchId = signals.id
+    val payload = generatePayload(signals, context.getSignaturesList().firstOrNull())
     val jobs = mutableListOf<Deferred<NetworkResponse>>()
+    val vpnEnabled = signals.network.vpnEnabled ?: false
+
     val sdkHeaders =
         mapOf(
             "X-SDK-DispatchID" to dispatchId,
@@ -103,6 +103,22 @@ private fun buildNetworkJobs(
         )
 
     when {
+        signals.network.vpnEnabled == true && (lanNetwork != null || cellularNetwork != null) -> {
+            val availableNetwork = lanNetwork ?: cellularNetwork
+            availableNetwork?.let {
+                jobs.add(
+                    it.requestJob(
+                        scope = scope,
+                        signalsUrl = signalsUrl,
+                        sdkHeaders = sdkHeaders,
+                        requestTimeout = configuration.requestTimeout,
+                        maxRetries = configuration.maxRetries,
+                        payload = if (signalsScope == SignalsScope.FULL) payload else null,
+                        vpnEnabled = vpnEnabled,
+                    ),
+                )
+            }
+        }
         lanNetwork != null && cellularNetwork != null -> {
             jobs.add(
                 cellularNetwork.requestJob(
@@ -111,6 +127,7 @@ private fun buildNetworkJobs(
                     sdkHeaders = sdkHeaders,
                     requestTimeout = configuration.requestTimeout,
                     maxRetries = configuration.maxRetries,
+                    vpnEnabled = vpnEnabled,
                 ),
             )
             if (signalsScope == SignalsScope.FULL) {
@@ -122,6 +139,7 @@ private fun buildNetworkJobs(
                         requestTimeout = configuration.requestTimeout,
                         maxRetries = configuration.maxRetries,
                         payload = payload,
+                        vpnEnabled = vpnEnabled,
                     ),
                 )
             }
@@ -135,6 +153,7 @@ private fun buildNetworkJobs(
                     requestTimeout = configuration.requestTimeout,
                     maxRetries = configuration.maxRetries,
                     payload = if (signalsScope == SignalsScope.FULL) payload else null,
+                    vpnEnabled = vpnEnabled,
                 ),
             )
         }
@@ -147,6 +166,7 @@ private fun buildNetworkJobs(
                     requestTimeout = configuration.requestTimeout,
                     maxRetries = configuration.maxRetries,
                     payload = if (signalsScope == SignalsScope.FULL) payload else null,
+                    vpnEnabled = vpnEnabled,
                 ),
             )
         }
@@ -163,6 +183,7 @@ private fun android.net.Network.requestJob(
     requestTimeout: Long,
     maxRetries: Int,
     payload: ByteArray? = null,
+    vpnEnabled: Boolean,
 ): Deferred<NetworkResponse> =
     scope.async {
         val contentHeaders =
@@ -177,6 +198,7 @@ private fun android.net.Network.requestJob(
             timeout = requestTimeout,
             maxRetries = maxRetries,
             body = payload,
+            vpnEnabled = vpnEnabled,
         ).send(this@requestJob)
     }
 

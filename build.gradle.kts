@@ -30,8 +30,6 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.workmanager)
-    implementation(libs.androidx.workmanager.ktx)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.prelude.core.sdk)
