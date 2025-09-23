@@ -1,7 +1,7 @@
 package so.prelude.android.sdk
 
 import android.content.Context
-import okhttp3.OkHttpClient
+import okhttp3.Interceptor
 
 /**
  * Configuration is the configuration for the Prelude SDK.
@@ -24,7 +24,7 @@ data class Configuration
         /**
          * The list of features to be advertised as supported by the local implementation of the Prelude SDK.
          */
-        var implementedFeatures: List<Features> = listOf(),
+        var implementedFeatures: List<Features> = emptyList(),
         /**
          * The timeout in milliseconds for the network requests.
          */
@@ -70,7 +70,7 @@ sealed class Endpoint {
      */
     data class Custom(
         val address: String,
-        val okHttpClient: OkHttpClient? = null,
+        val okHttpInterceptors: List<Interceptor> = emptyList(),
     ) : Endpoint()
 }
 

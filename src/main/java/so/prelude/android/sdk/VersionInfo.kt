@@ -17,7 +17,7 @@ object VersionInfo {
     /**
      * The patch version.
      */
-    const val PATCH = 1
+    const val PATCH = 3
 
     /**
      * The version string.
