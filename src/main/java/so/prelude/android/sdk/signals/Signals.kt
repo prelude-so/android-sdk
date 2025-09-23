@@ -8,9 +8,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import okhttp3.Interceptor
 import so.prelude.android.sdk.Application
 import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.Device
+import so.prelude.android.sdk.Endpoint
 import so.prelude.android.sdk.Features.Companion.toRawValue
 import so.prelude.android.sdk.Hardware
 import so.prelude.android.sdk.Network
@@ -34,13 +36,6 @@ internal suspend fun dispatchSignals(
     configuration: Configuration,
     signalsScope: SignalsScope,
 ): String {
-    val signalsUrl: URL =
-        try {
-            configuration.endpointAddress.toSignalsUrl()
-        } catch (e: Throwable) {
-            throw SDKError.ConfigurationError("cannot parse dispatch URL: ${e.message}")
-        }
-
     val context = configuration.context.applicationContext
     val lanNetwork = context.getLan()
     val cellularNetwork = context.getCellular()
@@ -54,7 +49,6 @@ internal suspend fun dispatchSignals(
     val results =
         buildNetworkJobs(
             scope = sdkInternalScope,
-            signalsUrl = signalsUrl,
             configuration = configuration,
             lanNetwork = lanNetwork,
             cellularNetwork = cellularNetwork,
@@ -63,7 +57,8 @@ internal suspend fun dispatchSignals(
         ).awaitAll()
 
     if (results.any { it is NetworkResponse.Error }) {
-        throw SDKError.RequestError("one or more requests failed to execute")
+        val errorMessage = results.filterIsInstance<NetworkResponse.Error>().joinToString { "${it.code}: ${it.message}" }
+        throw SDKError.RequestError("one or more requests failed to execute. Errors: $errorMessage")
     }
     return signals.id
 }
@@ -82,7 +77,6 @@ private fun Signals.Companion.collect(context: Context): Signals =
 
 private fun buildNetworkJobs(
     scope: CoroutineScope,
-    signalsUrl: URL,
     configuration: Configuration,
     lanNetwork: android.net.Network?,
     cellularNetwork: android.net.Network?,
@@ -94,6 +88,17 @@ private fun buildNetworkJobs(
     val payload = generatePayload(signals, context.getSignaturesList().firstOrNull())
     val jobs = mutableListOf<Deferred<NetworkResponse>>()
     val vpnEnabled = signals.network.vpnEnabled ?: false
+    val signalsUrl: URL =
+        try {
+            configuration.endpointAddress.toSignalsUrl()
+        } catch (e: Throwable) {
+            throw SDKError.ConfigurationError("cannot parse dispatch URL: ${e.message}")
+        }
+    val interceptors =
+        when (val endpoint = configuration.endpoint) {
+            is Endpoint.Custom -> endpoint.okHttpInterceptors
+            Endpoint.Default -> emptyList()
+        }
 
     val sdkHeaders =
         mapOf(
@@ -115,6 +120,7 @@ private fun buildNetworkJobs(
                         maxRetries = configuration.maxRetries,
                         payload = if (signalsScope == SignalsScope.FULL) payload else null,
                         vpnEnabled = vpnEnabled,
+                        okHttpInterceptors = interceptors,
                     ),
                 )
             }
@@ -128,6 +134,7 @@ private fun buildNetworkJobs(
                     requestTimeout = configuration.requestTimeout,
                     maxRetries = configuration.maxRetries,
                     vpnEnabled = vpnEnabled,
+                    okHttpInterceptors = interceptors,
                 ),
             )
             if (signalsScope == SignalsScope.FULL) {
@@ -140,6 +147,7 @@ private fun buildNetworkJobs(
                         maxRetries = configuration.maxRetries,
                         payload = payload,
                         vpnEnabled = vpnEnabled,
+                        okHttpInterceptors = interceptors,
                     ),
                 )
             }
@@ -154,6 +162,7 @@ private fun buildNetworkJobs(
                     maxRetries = configuration.maxRetries,
                     payload = if (signalsScope == SignalsScope.FULL) payload else null,
                     vpnEnabled = vpnEnabled,
+                    okHttpInterceptors = interceptors,
                 ),
             )
         }
@@ -167,6 +176,7 @@ private fun buildNetworkJobs(
                     maxRetries = configuration.maxRetries,
                     payload = if (signalsScope == SignalsScope.FULL) payload else null,
                     vpnEnabled = vpnEnabled,
+                    okHttpInterceptors = interceptors,
                 ),
             )
         }
@@ -184,6 +194,7 @@ private fun android.net.Network.requestJob(
     maxRetries: Int,
     payload: ByteArray? = null,
     vpnEnabled: Boolean,
+    okHttpInterceptors: List<Interceptor>,
 ): Deferred<NetworkResponse> =
     scope.async {
         val contentHeaders =
@@ -199,6 +210,7 @@ private fun android.net.Network.requestJob(
             maxRetries = maxRetries,
             body = payload,
             vpnEnabled = vpnEnabled,
+            okHttpInterceptors = okHttpInterceptors,
         ).send(this@requestJob)
     }
 

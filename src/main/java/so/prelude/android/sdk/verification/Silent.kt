@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import so.prelude.android.sdk.Configuration
+import so.prelude.android.sdk.Endpoint
 import so.prelude.android.sdk.network.getCellular
 import so.prelude.android.sdk.request.NetworkResponse
 import so.prelude.android.sdk.request.Request
@@ -25,9 +26,15 @@ internal suspend fun performSilentVerification(
                 mapOf(
                     "Connection" to "close",
                     "User-Agent" to userAgent,
+                    "Accept" to "text/html;q=0.9,application/xhtml+xml,application/xml,application/json,*/*;q=0.8",
                 ),
             includeRequestDateHeader = false,
             vpnEnabled = false,
+            okHttpInterceptors =
+                when (val endpoint = configuration.endpoint) {
+                    is Endpoint.Custom -> endpoint.okHttpInterceptors
+                    Endpoint.Default -> emptyList()
+                },
         )
 
     val cellular = configuration.context.getCellular()

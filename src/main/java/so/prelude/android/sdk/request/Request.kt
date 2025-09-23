@@ -2,6 +2,7 @@ package so.prelude.android.sdk.request
 
 import android.net.Network
 import kotlinx.coroutines.delay
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -36,8 +37,8 @@ internal class Request(
     private val timeout: Long = 2000L, // in milliseconds
     private val includeRequestDateHeader: Boolean = true,
     private val maxRetries: Int = 0,
-    private val okHttpClient: OkHttpClient? = null,
     private val vpnEnabled: Boolean,
+    private val okHttpInterceptors: List<Interceptor> = emptyList(),
 ) {
     suspend fun send(
         network: Network,
@@ -48,7 +49,7 @@ internal class Request(
             delay(requestDelay)
         }
 
-        val client = okHttpClient ?: buildOkHttpClient(network, headers, timeout, vpnEnabled)
+        val client = buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors)
 
         val request =
             Request
@@ -70,6 +71,7 @@ internal class Request(
         headers: Map<String, String>,
         timeout: Long,
         usingVpn: Boolean,
+        interceptors: List<Interceptor>,
     ): OkHttpClient {
         val clientBuilder =
             OkHttpClient
@@ -92,6 +94,10 @@ internal class Request(
 
                     chain.proceed(builder.build())
                 }
+
+        interceptors.forEach {
+            clientBuilder.addNetworkInterceptor(it)
+        }
 
         // Use the default socket factory for VPN requests, bind to the network for non-VPN requests.
         if (!usingVpn) {
