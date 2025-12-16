@@ -1,6 +1,7 @@
 package so.prelude.android.sdk.request
 
 import android.net.Network
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
@@ -9,6 +10,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.ResponseBody
 import okio.IOException
+import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.request.NetworkResponse.Error
 import so.prelude.android.sdk.request.NetworkResponse.Success
 import java.net.Proxy
@@ -34,37 +36,41 @@ internal class Request(
     private val method: String = "GET",
     private val headers: Map<String, String> = emptyMap(),
     private val body: ByteArray? = null,
-    private val timeout: Long = 2000L, // in milliseconds
+    private val timeout: Long = Configuration.DEFAULT_REQUEST_TIMEOUT, // in milliseconds
     private val includeRequestDateHeader: Boolean = true,
-    private val maxRetries: Int = 0,
+    private val maxRetries: Int = Configuration.DEFAULT_MAX_RETRY_COUNT,
     private val vpnEnabled: Boolean,
     private val okHttpInterceptors: List<Interceptor> = emptyList(),
 ) {
     suspend fun send(
         network: Network,
         retryCount: Int = this.maxRetries,
-    ): NetworkResponse {
-        val requestDelay = 2.0.pow(this.maxRetries - retryCount).toLong() * 250L
-        if (requestDelay > 0) {
-            delay(requestDelay)
+    ): NetworkResponse =
+        try {
+            val requestDelay = 2.0.pow(this.maxRetries - retryCount).toLong() * 250L
+            if (requestDelay > 0) {
+                delay(requestDelay)
+            }
+
+            val client = buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors)
+
+            val request =
+                Request
+                    .Builder()
+                    .url(url)
+                    .method(method, body?.toRequestBody(null, 0, body.size))
+                    .build()
+
+            when (val result = sendRequest(client, request, retryCount)) {
+                is RequestResult.Ok -> Success(fromPayloadRequest = request.body != null, code = result.code, body = result.body?.bytes())
+                is RequestResult.Error -> Error(fromPayloadRequest = request.body != null, code = result.code, message = result.message)
+                is RequestResult.Retry -> send(network, retryCount - 1)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Error(fromPayloadRequest = body != null, code = -1, message = e.message ?: "Unknown error")
         }
-
-        val client = buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors)
-
-        val request =
-            Request
-                .Builder()
-                .url(url)
-                .method(method, body?.toRequestBody(null, 0, body.size))
-                .build()
-
-        return when (val result = sendRequest(client, request, retryCount)) {
-            is RequestResult.Ok -> Success(result.code, result.body?.bytes())
-            is RequestResult.Error -> Error(result.code, result.message)
-            is RequestResult.Retry -> send(network, retryCount - 1)
-            is RequestResult.Throw -> throw result.error
-        }
-    }
 
     private fun buildOkHttpClient(
         network: Network,
@@ -127,14 +133,14 @@ internal class Request(
             if (hasRemainingRetries(currentRetries)) {
                 RequestResult.Retry
             } else {
-                RequestResult.Throw(e)
+                RequestResult.Error(message = e.message ?: "SocketTimeoutException", source = e)
             }
         } catch (e: IOException) {
-            RequestResult.Error(-1, e.message ?: "IOException")
+            RequestResult.Error(message = e.message ?: "IOException", source = e)
         } catch (e: IllegalStateException) {
-            RequestResult.Error(-1, e.message ?: "IllegalStateException")
+            RequestResult.Error(message = e.message ?: "IllegalStateException", source = e)
         } catch (e: Exception) {
-            RequestResult.Throw(e)
+            RequestResult.Error(message = e.message ?: "Exception", source = e)
         }
 
     private sealed interface RequestResult {
@@ -144,15 +150,12 @@ internal class Request(
         ) : RequestResult
 
         data class Error(
-            val code: Int,
+            val code: Int = -1,
             val message: String,
+            val source: Exception? = null,
         ) : RequestResult
 
         data object Retry : RequestResult
-
-        data class Throw(
-            val error: Exception,
-        ) : RequestResult
     }
 
     private fun Int.isInternalServerError(): Boolean = this in (500..599)

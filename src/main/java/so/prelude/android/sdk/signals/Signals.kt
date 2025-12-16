@@ -56,8 +56,10 @@ internal suspend fun dispatchSignals(
             signalsScope = signalsScope,
         ).awaitAll()
 
-    if (results.any { it is NetworkResponse.Error }) {
-        val errorMessage = results.filterIsInstance<NetworkResponse.Error>().joinToString { "${it.code}: ${it.message}" }
+    val anyWithPayload = results.any { it.fromPayloadRequest }
+    val errorsList = results.filterIsInstance<NetworkResponse.Error>()
+    val errorMessage = errorsList.joinToString { "${it.code}: ${it.message}. " }
+    if ((anyWithPayload && errorsList.any { it.fromPayloadRequest }) || (!anyWithPayload && errorsList.isNotEmpty())) {
         throw SDKError.RequestError("one or more requests failed to execute. Errors: $errorMessage")
     }
     return signals.id
@@ -125,6 +127,7 @@ private fun buildNetworkJobs(
                 )
             }
         }
+
         lanNetwork != null && cellularNetwork != null -> {
             jobs.add(
                 cellularNetwork.requestJob(
@@ -152,6 +155,7 @@ private fun buildNetworkJobs(
                 )
             }
         }
+
         lanNetwork != null -> {
             jobs.add(
                 lanNetwork.requestJob(
@@ -166,6 +170,7 @@ private fun buildNetworkJobs(
                 ),
             )
         }
+
         cellularNetwork != null -> {
             jobs.add(
                 cellularNetwork.requestJob(
@@ -180,7 +185,10 @@ private fun buildNetworkJobs(
                 ),
             )
         }
-        else -> Unit
+
+        else -> {
+            Unit
+        }
     }
 
     return jobs
