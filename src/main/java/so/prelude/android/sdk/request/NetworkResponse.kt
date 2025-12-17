@@ -5,14 +5,17 @@ package so.prelude.android.sdk.request
  */
 sealed class NetworkResponse(
     open val code: Int,
+    open val fromPayloadRequest: Boolean,
 ) {
     class Success(
         override val code: Int,
+        override val fromPayloadRequest: Boolean,
         val body: ByteArray?,
-    ) : NetworkResponse(code)
+    ) : NetworkResponse(code, fromPayloadRequest)
 
     class Error(
         override val code: Int,
+        override val fromPayloadRequest: Boolean,
         val message: String,
-    ) : NetworkResponse(code)
+    ) : NetworkResponse(code, fromPayloadRequest)
 }

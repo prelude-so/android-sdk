@@ -7,13 +7,13 @@ It is provided as a regular Maven artifact that you can use as a normal dependen
 
 ```
 (Kts)
-implementation("so.prelude.android:sdk:0.2.2")
+implementation("so.prelude.android:sdk:0.2.4")
 
 (Groovy)
-implementation 'so.prelude.android:sdk:0.2.2'
+implementation 'so.prelude.android:sdk:0.2.4'
 ```
 
-***Important: To use the SDK you will need the SDK key that you generate in the Prelude dashboard for your account. When it is created, you will be able to copy it and it should be stored in a safe location for later use, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use.***
+***Important: To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, you will be able to copy it and it should be stored in a safe location for later use, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use.***
 
 #### Capturing Signals
 
@@ -53,7 +53,7 @@ The Silent Verification feature allows you to verify a phone number without requ
 
 It is available for certain carriers and requires a server-side service to handle the verification process. For this verification method to work properly, you *must* collect the device signals mentioned before and report the dispatch identifier to your back-end (usually in your APIs verification endpoint).
 
-Please refer to the [Silent Verification documentation](https://docs.prelude.so/verify/silent/overview) for more information on how to implement this feature.
+Please refer to the [Silent Verification documentation](https://docs.prelude.so/verify/v2/documentation/silent-verification) for more information on how to implement this feature.
 
 #### Proguard
 

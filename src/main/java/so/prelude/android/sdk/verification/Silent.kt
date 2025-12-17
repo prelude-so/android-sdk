@@ -22,6 +22,7 @@ internal suspend fun performSilentVerification(
         Request(
             url = url,
             timeout = timeout.inWholeMilliseconds,
+            maxRetries = 0,
             headers =
                 mapOf(
                     "Connection" to "close",
@@ -42,10 +43,12 @@ internal suspend fun performSilentVerification(
         val json = Json { ignoreUnknownKeys = true }
         cellular?.let {
             when (val response = request.send(cellular)) {
-                is NetworkResponse.Error ->
+                is NetworkResponse.Error -> {
                     Result.failure(
                         VerificationException("Silent verification error: ${response.code}, ${response.message}"),
                     )
+                }
+
                 is NetworkResponse.Success -> {
                     if (response.body == null) {
                         Result.failure(VerificationException("Silent verification response is empty."))

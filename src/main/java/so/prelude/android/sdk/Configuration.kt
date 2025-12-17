@@ -47,12 +47,12 @@ data class Configuration
             /**
              * The default timeout.
              */
-            const val DEFAULT_REQUEST_TIMEOUT = 2000L
+            const val DEFAULT_REQUEST_TIMEOUT = 5000L
 
             /**
              * The default automatic retry count for server errors and timeouts.
              */
-            const val DEFAULT_MAX_RETRY_COUNT = 0
+            const val DEFAULT_MAX_RETRY_COUNT = 3
         }
     }
 
