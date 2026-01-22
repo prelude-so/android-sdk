@@ -11,6 +11,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody
 import okio.IOException
 import so.prelude.android.sdk.Configuration
+import so.prelude.android.sdk.network.NetworkBoundDns
 import so.prelude.android.sdk.request.NetworkResponse.Error
 import so.prelude.android.sdk.request.NetworkResponse.Success
 import java.net.Proxy
@@ -108,6 +109,7 @@ internal class Request(
         // Use the default socket factory for VPN requests, bind to the network for non-VPN requests.
         if (!usingVpn) {
             clientBuilder.socketFactory(network.socketFactory)
+            clientBuilder.dns(NetworkBoundDns(network))
         }
 
         return clientBuilder.build()
