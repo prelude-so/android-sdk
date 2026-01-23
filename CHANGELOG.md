@@ -2,6 +2,10 @@
 
 Prelude Android SDK Change Log
 
+## [0.2.5] - 2026-01-22
+
+- Added network-bound DNS resolver for improved Silent Network Authentication (SNA) reliability.
+
 ## [0.2.4] - 2025-12-16
 
 - Change default timeouts and retry count for the dispatch signals request. By default, requests now time out after 5 seconds and retries happen automatically up to three times.

@@ -51,6 +51,9 @@ data class Prelude(
             } catch (e: Exception) {
                 Log.e("Prelude", "Dispatch failed: ${e.message}")
                 dispatchStatusListener?.onStatus(Status.FAILURE, "")
+            } catch (e: LinkageError) {
+                Log.e("Prelude", "Dispatch failed: ${e.message}")
+                dispatchStatusListener?.onStatus(Status.FAILURE, "")
             }
         }
 
@@ -69,6 +72,9 @@ data class Prelude(
             } catch (e: Exception) {
                 Log.e("Prelude", "Dispatch failed: ${e.message}")
                 emit(DispatchProgress("", Status.FAILURE))
+            } catch (e: LinkageError) {
+                Log.e("Prelude", "Dispatch failed: ${e.message}")
+                emit(DispatchProgress("", Status.FAILURE))
             }
         }
 
@@ -81,6 +87,8 @@ data class Prelude(
                 )
             Result.success(dispatchId)
         } catch (e: Exception) {
+            Result.failure(e)
+        } catch (e: LinkageError) {
             Result.failure(e)
         }
 
