@@ -18,17 +18,21 @@ internal suspend fun performSilentVerification(
     timeout: Duration = 10.seconds,
     configuration: Configuration,
 ): Result<String> {
+    val quirks = ProviderQuirks.forURL(url)
+
+    val baseHeaders =
+        mapOf(
+            "Connection" to "close",
+            "User-Agent" to userAgent,
+            "Accept" to "*/*",
+        )
+
     val request =
         Request(
             url = url,
             timeout = timeout.inWholeMilliseconds,
             maxRetries = 0,
-            headers =
-                mapOf(
-                    "Connection" to "close",
-                    "User-Agent" to userAgent,
-                    "Accept" to "text/html;q=0.9,application/xhtml+xml,application/xml,application/json,*/*;q=0.8",
-                ),
+            headers = baseHeaders + quirks.headers,
             includeRequestDateHeader = false,
             vpnEnabled = false,
             okHttpInterceptors =

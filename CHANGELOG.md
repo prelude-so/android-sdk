@@ -2,6 +2,11 @@
 
 Prelude Android SDK Change Log
 
+## [0.3.0] - 2026-01-28
+
+- Updated core SDK to 0.2.0. It includes an updated version of JNA and automatic inclusion of Proguard rules.
+- Improved handling of Silent Network Authentication with specific settings per carrier.
+
 ## [0.2.5] - 2026-01-22
 
 - Added network-bound DNS resolver for improved Silent Network Authentication (SNA) reliability.

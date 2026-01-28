@@ -7,10 +7,10 @@ It is provided as a regular Maven artifact that you can use as a normal dependen
 
 ```
 (Kts)
-implementation("so.prelude.android:sdk:0.2.5")
+implementation("so.prelude.android:sdk:0.3.0")
 
 (Groovy)
-implementation 'so.prelude.android:sdk:0.2.5'
+implementation 'so.prelude.android:sdk:0.3.0'
 ```
 
 ***Important: To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, you will be able to copy it and it should be stored in a safe location for later use, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use.***
@@ -57,10 +57,13 @@ Please refer to the [Silent Verification documentation](https://docs.prelude.so/
 
 #### Proguard
 
-If you use minification in your application (i.e. `isMinifyEnabled = true` somewhere in your `build.gradle` file), please add the following lines to your Proguard configuration file to avoid runtime issues:
+If you use minification in your application (i.e. `isMinifyEnabled = true` somewhere in your `build.gradle` file), the SDK automatically provides rules that will be integrated into your project.
+
+If you find any Proguard runtime issues, these are the required rules for JNA:
 
 ```
 -dontwarn java.awt.*
 -keep class com.sun.jna.** { *; }
 -keep class * implements com.sun.jna.** { *; }
+-keepclassmembers class * extends com.sun.jna.* { public *; }
 ```
