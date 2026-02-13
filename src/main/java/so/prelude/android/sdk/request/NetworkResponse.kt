@@ -18,4 +18,10 @@ sealed class NetworkResponse(
         override val fromPayloadRequest: Boolean,
         val message: String,
     ) : NetworkResponse(code, fromPayloadRequest)
+
+    class Redirect(
+        override val code: Int,
+        override val fromPayloadRequest: Boolean,
+        val location: String,
+    ) : NetworkResponse(code, fromPayloadRequest)
 }

@@ -4,6 +4,9 @@ import android.content.Context
 import so.prelude.android.sdk.Application
 import so.prelude.android.sdk.ApplicationAndroidPlatform
 import so.prelude.android.sdk.ApplicationPlatform
+import so.prelude.android.sdk.ApplicationSdkInfo
+import so.prelude.android.sdk.VersionInfo
+import so.prelude.android.sdk.coreVersion
 
 internal fun Application.Companion.collect(context: Context): Application {
     val packageManager = context.packageManager
@@ -34,6 +37,10 @@ internal fun Application.Companion.collect(context: Context): Application {
                 packageName,
                 versionCode,
             ),
+        ),
+        ApplicationSdkInfo(
+            sdkVersion = VersionInfo.versionString,
+            coreVersion = coreVersion(),
         ),
     )
 }

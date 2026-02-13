@@ -13,6 +13,7 @@ import okio.IOException
 import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.network.NetworkBoundDns
 import so.prelude.android.sdk.request.NetworkResponse.Error
+import so.prelude.android.sdk.request.NetworkResponse.Redirect
 import so.prelude.android.sdk.request.NetworkResponse.Success
 import java.net.Proxy
 import java.net.SocketTimeoutException
@@ -31,6 +32,7 @@ import kotlin.math.pow
  * @property headers The HTTP headers to include in the request.
  * @property body The request body content.
  * @property timeout The request connection timeout in milliseconds.
+ * @property readTimeout The request read timeout in milliseconds. -1 uses the OkHttp default (10s).
  */
 internal class Request(
     private val url: URL,
@@ -38,22 +40,37 @@ internal class Request(
     private val headers: Map<String, String> = emptyMap(),
     private val body: ByteArray? = null,
     private val timeout: Long = Configuration.DEFAULT_REQUEST_TIMEOUT, // in milliseconds
+    private val readTimeout: Long = -1,
     private val includeRequestDateHeader: Boolean = true,
     private val maxRetries: Int = Configuration.DEFAULT_MAX_RETRY_COUNT,
     private val vpnEnabled: Boolean,
+    private val followRedirects: Boolean = true,
     private val okHttpInterceptors: List<Interceptor> = emptyList(),
 ) {
+    private var cachedClient: Pair<Network, OkHttpClient>? = null
+
+    private fun getOrCreateClient(network: Network): OkHttpClient =
+        cachedClient?.takeIf { it.first == network }?.second
+            ?: buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors).also {
+                cachedClient = Pair(network, it)
+            }
+
     suspend fun send(
         network: Network,
         retryCount: Int = this.maxRetries,
     ): NetworkResponse =
         try {
-            val requestDelay = 2.0.pow(this.maxRetries - retryCount).toLong() * 250L
+            val requestDelay =
+                if (retryCount == this.maxRetries) {
+                    0L
+                } else {
+                    2.0.pow(this.maxRetries - retryCount - 1).toLong() * 250L
+                }
             if (requestDelay > 0) {
                 delay(requestDelay)
             }
 
-            val client = buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors)
+            val client = getOrCreateClient(network)
 
             val request =
                 Request
@@ -63,9 +80,25 @@ internal class Request(
                     .build()
 
             when (val result = sendRequest(client, request, retryCount)) {
-                is RequestResult.Ok -> Success(fromPayloadRequest = request.body != null, code = result.code, body = result.body?.bytes())
-                is RequestResult.Error -> Error(fromPayloadRequest = request.body != null, code = result.code, message = result.message)
-                is RequestResult.Retry -> send(network, retryCount - 1)
+                is RequestResult.Ok -> {
+                    Success(fromPayloadRequest = request.body != null, code = result.code, body = result.body?.bytes())
+                }
+
+                is RequestResult.Redirect -> {
+                    Redirect(
+                        fromPayloadRequest = request.body != null,
+                        code = result.code,
+                        location = result.location,
+                    )
+                }
+
+                is RequestResult.Error -> {
+                    Error(fromPayloadRequest = request.body != null, code = result.code, message = result.message)
+                }
+
+                is RequestResult.Retry -> {
+                    send(network, retryCount - 1)
+                }
             }
         } catch (e: CancellationException) {
             throw e
@@ -83,7 +116,10 @@ internal class Request(
         val clientBuilder =
             OkHttpClient
                 .Builder()
+                .followRedirects(followRedirects)
+                .followSslRedirects(followRedirects)
                 .connectTimeout(timeout, MILLISECONDS)
+                .apply { if (readTimeout >= 0) readTimeout(readTimeout, MILLISECONDS) }
                 .proxy(Proxy.NO_PROXY)
                 .addNetworkInterceptor { chain ->
                     val builder = chain.request().newBuilder()
@@ -122,12 +158,21 @@ internal class Request(
     ): RequestResult =
         try {
             val response: Response = client.newCall(request).execute()
-            if (response.isSuccessful) {
-                RequestResult.Ok(response.code, response.body)
-            } else {
-                if (response.code.isInternalServerError() && hasRemainingRetries(currentRetries)) {
+            when {
+                response.isSuccessful -> {
+                    RequestResult.Ok(response.code, response.body)
+                }
+
+                response.isRedirect -> {
+                    response.header("Location")?.let { RequestResult.Redirect(response.code, it) }
+                        ?: RequestResult.Error(response.code, "Redirect without Location header")
+                }
+
+                response.code.isInternalServerError() && hasRemainingRetries(currentRetries) -> {
                     RequestResult.Retry
-                } else {
+                }
+
+                else -> {
                     RequestResult.Error(response.code, response.message)
                 }
             }
@@ -155,6 +200,11 @@ internal class Request(
             val code: Int = -1,
             val message: String,
             val source: Exception? = null,
+        ) : RequestResult
+
+        data class Redirect(
+            val code: Int,
+            val location: String,
         ) : RequestResult
 
         data object Retry : RequestResult

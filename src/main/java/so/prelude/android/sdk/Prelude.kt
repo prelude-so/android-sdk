@@ -96,7 +96,7 @@ data class Prelude(
     fun verifySilent(
         url: URL,
         listener: VerificationListener,
-        timeout: Long = 10000,
+        timeout: Long = 20000,
     ) {
         sdkInternalScope.launch {
             verifySilent(url, timeout.milliseconds)
@@ -110,7 +110,7 @@ data class Prelude(
 
     suspend fun verifySilent(
         url: URL,
-        timeout: Duration = 10.seconds,
+        timeout: Duration = 20.seconds,
     ): Result<String> = performSilentVerification(url, timeout, configuration)
 
     data class DispatchProgress(

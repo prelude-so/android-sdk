@@ -2,6 +2,12 @@
 
 Prelude Android SDK Change Log
 
+## [0.4.0] - 2026-02-13
+
+- Implemented auto-retries during Silent Network Authentication redirection flow with configurable timeouts and exponential backoff.
+- Increased default Silent Network Authentication timeout to 20 seconds.
+- Optimised signals collection times.
+
 ## [0.3.0] - 2026-01-28
 
 - Updated core SDK to 0.2.0. It includes an updated version of JNA and automatic inclusion of Proguard rules.
