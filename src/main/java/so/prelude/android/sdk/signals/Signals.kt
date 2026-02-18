@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import okhttp3.Interceptor
 import so.prelude.android.sdk.Application
 import so.prelude.android.sdk.Configuration
@@ -65,22 +66,26 @@ internal suspend fun dispatchSignals(
     return signals.id
 }
 
-private fun Signals.Companion.collect(context: Context): Signals =
-    with(context.applicationContext) {
-        val id = dispatchId()
-        val application = Application.collect(this)
-        val device = Device.collect(this)
-        val hardware = Hardware.collect(this)
-        val network = Network.collect(this)
+private suspend fun Signals.Companion.collect(context: Context): Signals {
+    val appContext = context.applicationContext
+
+    return coroutineScope {
+        val id = async { dispatchId() }
+        val application = async { Application.collect(appContext) }
+        val device = async { Device.collect(appContext) }
+        val hardware = async { Hardware.collect(appContext) }
+        val network = async { Network.collect(appContext) }
+
         Signals(
-            id,
+            id.await(),
             Instant.now(),
-            application,
-            device,
-            hardware,
-            network,
+            application.await(),
+            device.await(),
+            hardware.await(),
+            network.await(),
         )
     }
+}
 
 private fun buildNetworkJobs(
     scope: CoroutineScope,
