@@ -2,6 +2,10 @@
 
 Prelude Android SDK Change Log
 
+## [0.4.1] - 2026-02-18
+
+- Signals collection and general performance improvements.
+
 ## [0.4.0] - 2026-02-13
 
 - Implemented auto-retries during Silent Network Authentication redirection flow with configurable timeouts and exponential backoff.
