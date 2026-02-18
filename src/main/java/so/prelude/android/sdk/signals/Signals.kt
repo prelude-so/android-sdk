@@ -67,13 +67,18 @@ internal suspend fun dispatchSignals(
 
 private fun Signals.Companion.collect(context: Context): Signals =
     with(context.applicationContext) {
+        val id = dispatchId()
+        val application = Application.collect(this)
+        val device = Device.collect(this)
+        val hardware = Hardware.collect(this)
+        val network = Network.collect(this)
         Signals(
-            dispatchId(),
+            id,
             Instant.now(),
-            Application.collect(this),
-            Device.collect(this),
-            Hardware.collect(this),
-            Network.collect(this),
+            application,
+            device,
+            hardware,
+            network,
         )
     }
 
@@ -87,7 +92,7 @@ private fun buildNetworkJobs(
 ): List<Deferred<NetworkResponse>> {
     val context = configuration.context.applicationContext
     val dispatchId = signals.id
-    val payload = generatePayload(signals, context.getSignaturesList().firstOrNull())
+    val payload by lazy { generatePayload(signals, context.getSignaturesList().firstOrNull()) }
     val jobs = mutableListOf<Deferred<NetworkResponse>>()
     val vpnEnabled = signals.network.vpnEnabled ?: false
     val signalsUrl: URL =
