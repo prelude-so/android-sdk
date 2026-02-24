@@ -50,7 +50,7 @@ internal fun Device.Companion.collect(context: Context): Device {
     }
 
     val systemVersion: String? by lazy {
-        android.os.Build.VERSION.RELEASE
+        Build.VERSION.RELEASE
     }
 
     @SuppressLint("HardwareIds")
@@ -107,9 +107,11 @@ internal fun Device.Companion.collect(context: Context): Device {
     val fontsDigest: String? by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val md = MessageDigest.getInstance("SHA-256")
-            for (font in SystemFonts.getAvailableFonts()) {
-                md.update(font.buffer)
-            }
+            SystemFonts
+                .getAvailableFonts()
+                .mapNotNull { it.file?.name }
+                .sorted()
+                .forEach { md.update(it.toByteArray()) }
             md.digest().joinToString("") { "%02x".format(it) }
         } else {
             null
