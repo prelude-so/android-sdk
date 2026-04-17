@@ -114,9 +114,9 @@ private fun buildNetworkJobs(
 
     val sdkHeaders =
         mapOf(
-            "X-SDK-DispatchID" to dispatchId,
-            "X-SDK-Key" to configuration.sdkKey,
-            "X-SDK-Implemented-Features" to configuration.implementedFeatures.toRawValue().toString(),
+            "x-sdk-dispatchid" to dispatchId,
+            "x-sdk-key" to configuration.sdkKey,
+            "x-sdk-implemented-features" to configuration.implementedFeatures.toRawValue().toString(),
         )
 
     when {
@@ -217,8 +217,8 @@ private fun android.net.Network.requestJob(
     scope.async {
         val contentHeaders =
             mapOf(
-                "Content-Encoding" to "deflate",
-                "Content-Type" to "application/vnd.prelude.signals",
+                "content-encoding" to "deflate",
+                "content-type" to "application/vnd.prelude.signals",
             )
         Request(
             url = signalsUrl,
