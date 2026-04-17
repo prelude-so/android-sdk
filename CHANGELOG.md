@@ -2,6 +2,13 @@
 
 Prelude Android SDK Change Log
 
+## [0.5.0] - 2026-04-17
+
+- Updated core SDK to 0.4.0.
+- Improved Silent Network Authentication per carrier configuration.
+- Strengthen device signals.
+- Improved the signal dispatch algorithm.
+
 ## [0.4.1] - 2026-02-18
 
 - Signals collection and general performance improvements.

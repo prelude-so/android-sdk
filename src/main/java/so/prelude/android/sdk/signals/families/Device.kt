@@ -9,8 +9,10 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
+import so.prelude.android.sdk.AndroidBuild
 import so.prelude.android.sdk.BatteryState
 import so.prelude.android.sdk.Device
+import so.prelude.android.sdk.DeviceAndroidProperties
 import so.prelude.android.sdk.Platform
 import java.security.MessageDigest
 import java.time.Instant
@@ -182,5 +184,94 @@ internal fun Device.Companion.collect(context: Context): Device {
         batteryState,
         fontsDigest,
         simulator,
+        null,
+        collectAndroidProperties(),
     )
 }
+
+@Suppress("DEPRECATION")
+private fun collectAndroidProperties(): DeviceAndroidProperties =
+    DeviceAndroidProperties(
+        build = collectAndroidBuild(),
+    )
+
+@Suppress("DEPRECATION")
+private fun collectAndroidBuild(): AndroidBuild =
+    AndroidBuild(
+        board = readProperty { Build.BOARD },
+        bootloader = readProperty { Build.BOOTLOADER },
+        brand = readProperty { Build.BRAND },
+        device = readProperty { Build.DEVICE },
+        display = readProperty { Build.DISPLAY },
+        fingerprint = readProperty { Build.FINGERPRINT },
+        hardware = readProperty { Build.HARDWARE },
+        host = readProperty { Build.HOST },
+        id = readProperty { Build.ID },
+        product = readProperty { Build.PRODUCT },
+        supportedAbis = readProperty { Build.SUPPORTED_ABIS?.toList() },
+        supported32BitAbis = readProperty { Build.SUPPORTED_32_BIT_ABIS?.toList() },
+        supported64BitAbis = readProperty { Build.SUPPORTED_64_BIT_ABIS?.toList() },
+        tags = readProperty { Build.TAGS },
+        buildType = readProperty { Build.TYPE },
+        time = readProperty { Build.TIME },
+        user = readProperty { Build.USER },
+        versionBaseOs =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                readProperty { Build.VERSION.BASE_OS }
+            } else {
+                null
+            },
+        versionCodename = readProperty { Build.VERSION.CODENAME },
+        versionIncremental = readProperty { Build.VERSION.INCREMENTAL },
+        versionMediaPerformanceClass =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                readProperty { Build.VERSION.MEDIA_PERFORMANCE_CLASS }
+            } else {
+                null
+            },
+        versionPreviewSdkInt =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                readProperty { Build.VERSION.PREVIEW_SDK_INT }
+            } else {
+                null
+            },
+        versionReleaseOrCodename =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                readProperty { Build.VERSION.RELEASE_OR_CODENAME }
+            } else {
+                null
+            },
+        versionSdkInt = readProperty { Build.VERSION.SDK_INT },
+        versionSecurityPatch =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                readProperty { Build.VERSION.SECURITY_PATCH }
+            } else {
+                null
+            },
+        socManufacturer =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                readProperty { Build.SOC_MANUFACTURER }
+            } else {
+                null
+            },
+        socModel =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                readProperty { Build.SOC_MODEL }
+            } else {
+                null
+            },
+        odmSku =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                readProperty { Build.ODM_SKU }
+            } else {
+                null
+            },
+        sku =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                readProperty { Build.SKU }
+            } else {
+                null
+            },
+    )
+
+private fun <T> readProperty(prop: () -> T): T? = runCatching { prop() }.getOrNull()

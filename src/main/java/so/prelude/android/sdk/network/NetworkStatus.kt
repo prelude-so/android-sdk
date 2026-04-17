@@ -7,23 +7,52 @@ import android.net.Network
 import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
 import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
+import android.net.NetworkRequest
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
 
-internal fun Context.getLan(): Network? =
-    getNetworkForTransports(
+private const val NETWORK_ACQUIRE_TIMEOUT_MS = 50L
+
+internal suspend fun Context.getLan(): Network? =
+    requestNetworkForTransport(
         listOf(
             TRANSPORT_WIFI,
             TRANSPORT_ETHERNET,
         ),
     )
 
-internal fun Context.getCellular(): Network? = getNetworkForTransports(listOf(TRANSPORT_CELLULAR))
+internal suspend fun Context.getCellular(): Network? = requestNetworkForTransport(listOf(TRANSPORT_CELLULAR))
 
-@Suppress("DEPRECATION")
-private fun Context.getNetworkForTransports(transports: List<Int>): Network? {
+private suspend fun Context.requestNetworkForTransport(transports: List<Int>): Network? {
     val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+    val result = CompletableDeferred<Network>()
 
-    return connectivityManager.allNetworks.firstOrNull { network ->
-        val capabilities = connectivityManager.getNetworkCapabilities(network)
-        capabilities != null && transports.any { capabilities.hasTransport(it) }
+    // Issue one requestNetwork call per transport to get OR semantics.
+    // On Android 12+, a single request with multiple transports requires ALL of them
+    // simultaneously (AND semantics), so we race separate requests instead.
+    val callbacks = mutableListOf<ConnectivityManager.NetworkCallback>()
+
+    return try {
+        for (transport in transports) {
+            val request =
+                NetworkRequest
+                    .Builder()
+                    .addTransportType(transport)
+                    .build()
+
+            val callback: ConnectivityManager.NetworkCallback =
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        result.complete(network)
+                    }
+                }
+
+            connectivityManager.requestNetwork(request, callback)
+            callbacks.add(callback)
+        }
+
+        withTimeoutOrNull(NETWORK_ACQUIRE_TIMEOUT_MS) { result.await() }
+    } finally {
+        callbacks.forEach { runCatching { connectivityManager.unregisterNetworkCallback(it) } }
     }
 }

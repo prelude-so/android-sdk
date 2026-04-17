@@ -8,6 +8,6 @@ internal val userAgent = "Prelude/${VersionInfo.versionString} Core/${coreVersio
 
 internal val commonHeaders =
     mapOf(
-        "Connection" to "close",
-        "User-Agent" to userAgent,
+        "connection" to "close",
+        "user-agent" to userAgent,
     )
