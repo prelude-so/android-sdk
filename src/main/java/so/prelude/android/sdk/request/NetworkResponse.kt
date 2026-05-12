@@ -23,5 +23,6 @@ sealed class NetworkResponse(
         override val code: Int,
         override val fromPayloadRequest: Boolean,
         val location: String,
+        val headers: Map<String, List<String>> = emptyMap(),
     ) : NetworkResponse(code, fromPayloadRequest)
 }

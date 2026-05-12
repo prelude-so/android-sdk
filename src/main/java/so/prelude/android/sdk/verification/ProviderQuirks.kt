@@ -48,7 +48,7 @@ private val providerQuirksMap: Map<String, ProviderQuirks> =
             ProviderQuirks(
                 headers =
                     mapOf(
-                        "Accept" to "text/html;q=0.9,application/xhtml+xml,application/xml,application/json,*/*;q=0.8",
+                        "accept" to "text/html;q=0.9,application/xhtml+xml,application/xml,application/json,*/*;q=0.8",
                     ),
             ),
     )
