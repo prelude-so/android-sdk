@@ -3,24 +3,25 @@
 
 The Android SDK allows you to capture certain device signals that will be reported back to Prelude to help fight fraud. It will also allow you to perform silent verification of mobile devices.
 
-It is provided as a regular Maven artifact that you can use as a normal dependency in your Android application, just add it as an implementation dependency:
+It is provided as a regular Maven artifact that you can use as a normal dependency in your Android application, add it as an implementation dependency:
 
-```
-(Kts)
-implementation("so.prelude.android:sdk:0.5.0")
+<CodeGroup>
+    ```kts Kts
+    implementation("so.prelude.android:sdk:0.5.1")
+    ```
+    ```groovy Groovy
+    implementation 'so.prelude.android:sdk:0.5.1'
+    ```
+</CodeGroup>
 
-(Groovy)
-implementation 'so.prelude.android:sdk:0.5.0'
-```
-
-***Important: To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, you will be able to copy it and it should be stored in a safe location for later use, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use.***
+To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, you will be able to copy it and it should be stored in a safe location for later use, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use.
 
 #### Capturing Signals
 
 To capture device signals you just need to configure it with your SDK key and call a single dispatch function:
 
-**Kotlin**:
-```
+<CodeGroup>
+```kotlin Kotlin
 coroutineScope.launch {
   val prelude = Prelude(Configuration(context = context, sdkKey = "sdk_XXXXXXXXXXXXXXXX"))
   val dispatchId: String? = prelude.dispatchSignals().getOrNull()
@@ -29,8 +30,7 @@ coroutineScope.launch {
 }
 ```
 
-**Java**:
-```
+```java Java
 Prelude prelude = new Prelude(new Configuration(context, "sdk_XXXXXXXXXXXXXXXX"));
 prelude.dispatchSignals((status, dispatchId) -> {
     if (status == DispatchStatusListener.Status.SUCCESS) {
@@ -38,6 +38,7 @@ prelude.dispatchSignals((status, dispatchId) -> {
     }
 });
 ```
+</CodeGroup>
 
 The `dispatchSignals` function will capture the device signals and report them to Prelude. It will return a `dispatchId` string that you should report back to your back-end to enhance the phone number verification process.
 

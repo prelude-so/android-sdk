@@ -76,6 +76,7 @@ internal suspend fun performSilentVerification(
                             vpnEnabled = false,
                             followRedirects = false,
                             okHttpInterceptors = interceptors,
+                            allowInsecureTLS = configuration.allowInsecureTLS,
                         )
 
                     when (val firstResponse = firstRequest.send(cellular)) {
@@ -123,6 +124,7 @@ internal suspend fun performSilentVerification(
                         followRedirects = true,
                         okHttpInterceptors = interceptors,
                         tlsVersions = tlsVersions,
+                        allowInsecureTLS = configuration.allowInsecureTLS,
                     )
 
                 when (val response = request.send(cellular)) {

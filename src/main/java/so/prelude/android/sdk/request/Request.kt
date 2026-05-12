@@ -8,7 +8,6 @@ import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import okio.IOException
 import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.network.NetworkBoundDns
@@ -55,12 +54,13 @@ internal class Request(
     private val followRedirects: Boolean = true,
     private val okHttpInterceptors: List<Interceptor> = emptyList(),
     private val tlsVersions: List<OkHttpTlsVersion>? = null,
+    private val allowInsecureTLS: Boolean = false,
 ) {
     private var cachedClient: Pair<Network, OkHttpClient>? = null
 
     private fun getOrCreateClient(network: Network): OkHttpClient =
         cachedClient?.takeIf { it.first == network }?.second
-            ?: buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors, tlsVersions).also {
+            ?: buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors, tlsVersions, allowInsecureTLS).also {
                 cachedClient = Pair(network, it)
             }
 
@@ -117,6 +117,7 @@ internal class Request(
         usingVpn: Boolean,
         interceptors: List<Interceptor>,
         tlsVersions: List<OkHttpTlsVersion>? = null,
+        allowInsecureTLS: Boolean = false,
     ): OkHttpClient {
         val clientBuilder =
             OkHttpClient
@@ -142,6 +143,31 @@ internal class Request(
 
                     chain.proceed(builder.build())
                 }
+
+        if (allowInsecureTLS) {
+            val trustAll =
+                @Suppress("CustomX509TrustManager")
+                object : javax.net.ssl.X509TrustManager {
+                    override fun checkClientTrusted(
+                        chain: Array<java.security.cert.X509Certificate>,
+                        authType: String,
+                    ) = Unit
+
+                    override fun checkServerTrusted(
+                        chain: Array<java.security.cert.X509Certificate>,
+                        authType: String,
+                    ) = Unit
+
+                    override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
+                }
+            val sslContext =
+                javax.net.ssl.SSLContext.getInstance("TLS").apply {
+                    init(null, arrayOf(trustAll), java.security.SecureRandom())
+                }
+            clientBuilder
+                .sslSocketFactory(sslContext.socketFactory, trustAll)
+                .hostnameVerifier { _, _ -> true }
+        }
 
         if (tlsVersions != null) {
             val spec =

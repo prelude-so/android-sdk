@@ -4,12 +4,23 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
+val sdkVersion = "0.5.1"
+
 android {
     namespace = "so.prelude.android.sdk"
     compileSdk = 34
 
     defaultConfig {
         minSdk = 26
+        buildConfigField("String", "SDK_VERSION", "\"$sdkVersion\"")
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     buildTypes {
@@ -33,5 +44,8 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.okhttp)
     implementation(libs.prelude.core.sdk)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
 }
 

@@ -2,6 +2,12 @@
 
 Prelude Android SDK Change Log
 
+## [0.5.1] - 2026-05-12
+
+- Fix signal dispatch failing when transport detection raced a 50ms requestNetwork callback. Network discovery is now a synchronous snapshot of `ConnectivityManager.allNetworks`, mirroring iOS `NWPathMonitor`.
+- Add `Configuration.allowInsecureTLS` to bypass TLS certificate/hostname validation for staging endpoints (off by default; do not enable in production).
+- Fix runtime `VersionInfo.versionString` (and the User-Agent / signals payload it feeds) drifting from the published Maven coordinates: both are now driven by a single `sdkVersion` constant in `build.gradle.kts`.
+
 ## [0.5.0] - 2026-04-17
 
 - Updated core SDK to 0.4.0.
