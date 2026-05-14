@@ -7,52 +7,43 @@ import android.net.Network
 import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
 import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
-import android.net.NetworkRequest
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withTimeoutOrNull
 
-private const val NETWORK_ACQUIRE_TIMEOUT_MS = 50L
+private val LAN_TRANSPORTS = listOf(TRANSPORT_WIFI, TRANSPORT_ETHERNET)
+private val CELLULAR_TRANSPORTS = listOf(TRANSPORT_CELLULAR)
 
-internal suspend fun Context.getLan(): Network? =
-    requestNetworkForTransport(
-        listOf(
-            TRANSPORT_WIFI,
-            TRANSPORT_ETHERNET,
-        ),
-    )
+internal fun Context.getLan(): Network? = connectivityManager().firstMatching(LAN_TRANSPORTS)
 
-internal suspend fun Context.getCellular(): Network? = requestNetworkForTransport(listOf(TRANSPORT_CELLULAR))
+internal fun Context.getCellular(): Network? = connectivityManager().firstMatching(CELLULAR_TRANSPORTS)
 
-private suspend fun Context.requestNetworkForTransport(transports: List<Int>): Network? {
-    val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-    val result = CompletableDeferred<Network>()
+private fun Context.connectivityManager(): ConnectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
-    // Issue one requestNetwork call per transport to get OR semantics.
-    // On Android 12+, a single request with multiple transports requires ALL of them
-    // simultaneously (AND semantics), so we race separate requests instead.
-    val callbacks = mutableListOf<ConnectivityManager.NetworkCallback>()
-
-    return try {
-        for (transport in transports) {
-            val request =
-                NetworkRequest
-                    .Builder()
-                    .addTransportType(transport)
-                    .build()
-
-            val callback: ConnectivityManager.NetworkCallback =
-                object : ConnectivityManager.NetworkCallback() {
-                    override fun onAvailable(network: Network) {
-                        result.complete(network)
-                    }
-                }
-
-            connectivityManager.requestNetwork(request, callback)
-            callbacks.add(callback)
+/**
+ * Synchronous lookup of a Network matching one of [transports].
+ *
+ * Two-step strategy:
+ * 1. Modern path (non-deprecated): check `activeNetwork`. Hits the common case
+ *    where the requested transport is the device's default network — most users
+ *    most of the time.
+ * 2. Fallback (deprecated `allNetworks`): only used when the active network is
+ *    a different transport (e.g. asking for cellular while Wi-Fi is default).
+ *    `allNetworks` is the only synchronous "enumerate all known networks" API
+ *    Android offers; the deprecation has no announced removal date and the
+ *    callback-based replacement has different semantics (async, requires
+ *    long-lived registration) which previously caused the regression this
+ *    code path is fixing.
+ *
+ * Mirrors iOS `NWPathMonitor`'s initial path emit.
+ */
+internal fun ConnectivityManager.firstMatching(transports: List<Int>): Network? {
+    activeNetwork?.let { active ->
+        getNetworkCapabilities(active)?.let { caps ->
+            if (transports.any { caps.hasTransport(it) }) return active
         }
-
-        withTimeoutOrNull(NETWORK_ACQUIRE_TIMEOUT_MS) { result.await() }
-    } finally {
-        callbacks.forEach { runCatching { connectivityManager.unregisterNetworkCallback(it) } }
+    }
+    @Suppress("DEPRECATION")
+    return allNetworks.firstOrNull { network ->
+        getNetworkCapabilities(network)?.let { caps ->
+            transports.any { caps.hasTransport(it) }
+        } ?: false
     }
 }

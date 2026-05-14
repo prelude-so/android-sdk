@@ -133,6 +133,7 @@ private fun buildNetworkJobs(
                         payload = if (signalsScope == SignalsScope.FULL) payload else null,
                         vpnEnabled = vpnEnabled,
                         okHttpInterceptors = interceptors,
+                        allowInsecureTLS = configuration.allowInsecureTLS,
                     ),
                 )
             }
@@ -148,6 +149,7 @@ private fun buildNetworkJobs(
                     maxRetries = configuration.maxRetries,
                     vpnEnabled = vpnEnabled,
                     okHttpInterceptors = interceptors,
+                    allowInsecureTLS = configuration.allowInsecureTLS,
                 ),
             )
             if (signalsScope == SignalsScope.FULL) {
@@ -161,6 +163,7 @@ private fun buildNetworkJobs(
                         payload = payload,
                         vpnEnabled = vpnEnabled,
                         okHttpInterceptors = interceptors,
+                        allowInsecureTLS = configuration.allowInsecureTLS,
                     ),
                 )
             }
@@ -177,6 +180,7 @@ private fun buildNetworkJobs(
                     payload = if (signalsScope == SignalsScope.FULL) payload else null,
                     vpnEnabled = vpnEnabled,
                     okHttpInterceptors = interceptors,
+                    allowInsecureTLS = configuration.allowInsecureTLS,
                 ),
             )
         }
@@ -192,6 +196,7 @@ private fun buildNetworkJobs(
                     payload = if (signalsScope == SignalsScope.FULL) payload else null,
                     vpnEnabled = vpnEnabled,
                     okHttpInterceptors = interceptors,
+                    allowInsecureTLS = configuration.allowInsecureTLS,
                 ),
             )
         }
@@ -213,6 +218,7 @@ private fun android.net.Network.requestJob(
     payload: ByteArray? = null,
     vpnEnabled: Boolean,
     okHttpInterceptors: List<Interceptor>,
+    allowInsecureTLS: Boolean,
 ): Deferred<NetworkResponse> =
     scope.async {
         val contentHeaders =
@@ -229,6 +235,7 @@ private fun android.net.Network.requestJob(
             body = payload,
             vpnEnabled = vpnEnabled,
             okHttpInterceptors = okHttpInterceptors,
+            allowInsecureTLS = allowInsecureTLS,
         ).send(this@requestJob)
     }
 

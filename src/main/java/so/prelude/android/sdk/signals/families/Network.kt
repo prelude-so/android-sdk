@@ -8,7 +8,6 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.NetworkCapabilities.TRANSPORT_VPN
 import android.telephony.TelephonyManager
-import android.telephony.TelephonyManager.DATA_CONNECTED
 import android.telephony.TelephonyManager.SIM_STATE_READY
 import androidx.core.content.ContextCompat
 import so.prelude.android.sdk.Network
@@ -17,8 +16,15 @@ internal fun Network.Companion.collect(context: Context): Network {
     val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
     val cellularData: Boolean? by lazy {
-        telephonyManager.simState == SIM_STATE_READY &&
-            telephonyManager.dataState == DATA_CONNECTED
+        // "Cellular available" (matches iOS), not "cellular is the active data route".
+        // networkOperator is empty when not registered to a tower; no permission needed
+        // (getServiceState() would be stronger but requires READ_PHONE_STATE on API 30+).
+        try {
+            telephonyManager.simState == SIM_STATE_READY &&
+                telephonyManager.networkOperator.orEmpty().isNotEmpty()
+        } catch (e: Exception) {
+            null
+        }
     }
 
     val vpnEnabled: Boolean? by lazy {
