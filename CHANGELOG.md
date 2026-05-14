@@ -2,6 +2,10 @@
 
 Prelude Android SDK Change Log
 
+## [0.5.2] - 2026-05-14
+
+- Fix `dispatchSignals` triggering `StrictMode IncorrectContextUseViolation` on Android 12+ (API 31+) when callers configure `detectIncorrectContextUse()`. With `penaltyDeath()` set this previously killed the process on the first dispatch. Display metrics are now read via `DisplayManager`, which is safe to access from any context, instead of `WindowManager`.
+
 ## [0.5.1] - 2026-05-12
 
 - Fix signal dispatch failing when transport detection raced a 50ms requestNetwork callback. Network discovery is now a synchronous snapshot of `ConnectivityManager.allNetworks`, mirroring iOS `NWPathMonitor`.

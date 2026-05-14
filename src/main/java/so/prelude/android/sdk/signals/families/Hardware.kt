@@ -1,64 +1,31 @@
 package so.prelude.android.sdk.signals.families
 
 import android.content.Context
+import android.hardware.display.DisplayManager
 import android.util.DisplayMetrics
-import android.view.WindowManager
+import android.view.Display
 import so.prelude.android.sdk.DisplayResolution
 import so.prelude.android.sdk.Hardware
 
 internal fun Hardware.Companion.collect(context: Context): Hardware {
-    val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    // DISPLAY_SERVICE is non-visual and safe from any context, unlike WINDOW_SERVICE
+    // which trips StrictMode#detectIncorrectContextUse on Application context (API 30+).
+    val display: Display? =
+        (context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager)
+            ?.getDisplay(Display.DEFAULT_DISPLAY)
 
-    val manufacturer: String? by lazy {
-        android.os.Build.MANUFACTURER
+    val manufacturer: String? by lazy { android.os.Build.MANUFACTURER }
+    val model: String? by lazy { android.os.Build.MODEL }
+    val architecture: String? by lazy { System.getProperty("os.arch") }
+    val cpuCount: Int? by lazy { Runtime.getRuntime().availableProcessors() }
+    val cpuFrequency: Int? by lazy { null }
+    val memorySize: Long? by lazy { Runtime.getRuntime().totalMemory() }
+
+    val displayMetrics: DisplayMetrics? by lazy {
+        display?.let { DisplayMetrics().also(it::getMetrics) }
     }
-
-    val model: String? by lazy {
-        android.os.Build.MODEL
-    }
-
-    val architecture: String? by lazy {
-        System.getProperty("os.arch")
-    }
-
-    val cpuCount: Int? by lazy {
-        Runtime.getRuntime().availableProcessors()
-    }
-
-    val cpuFrequency: Int? by lazy {
-        null
-    }
-
-    val memorySize: Long? by lazy {
-        Runtime.getRuntime().totalMemory()
-    }
-
-    val displayMetrics: DisplayMetrics by lazy {
-        val metrics = DisplayMetrics()
-        windowManager.defaultDisplay.getMetrics(metrics)
-        metrics
-    }
-
-    val displayResolution: DisplayResolution? by lazy {
-        DisplayResolution(displayMetrics.widthPixels, displayMetrics.heightPixels)
-    }
-
-    val displayScale: Float? by lazy {
-        displayMetrics.density
-    }
-
-    val displayPhysicalMetrics: DisplayMetrics by lazy {
-        val metrics = DisplayMetrics()
-        windowManager.defaultDisplay.getRealMetrics(metrics)
-        metrics
-    }
-
-    val displayPhysicalResolution: DisplayResolution? by lazy {
-        DisplayResolution(displayPhysicalMetrics.widthPixels, displayPhysicalMetrics.heightPixels)
-    }
-
-    val displayPhysicalScale: Float? by lazy {
-        displayPhysicalMetrics.density
+    val displayPhysicalMetrics: DisplayMetrics? by lazy {
+        display?.let { DisplayMetrics().also(it::getRealMetrics) }
     }
 
     return Hardware(
@@ -68,9 +35,9 @@ internal fun Hardware.Companion.collect(context: Context): Hardware {
         cpuCount,
         cpuFrequency,
         memorySize,
-        displayResolution,
-        displayScale,
-        displayPhysicalResolution,
-        displayPhysicalScale,
+        displayMetrics?.let { DisplayResolution(it.widthPixels, it.heightPixels) },
+        displayMetrics?.density,
+        displayPhysicalMetrics?.let { DisplayResolution(it.widthPixels, it.heightPixels) },
+        displayPhysicalMetrics?.density,
     )
 }

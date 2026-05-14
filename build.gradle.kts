@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
-val sdkVersion = "0.5.1"
+val sdkVersion = "0.5.2"
 
 android {
     namespace = "so.prelude.android.sdk"
