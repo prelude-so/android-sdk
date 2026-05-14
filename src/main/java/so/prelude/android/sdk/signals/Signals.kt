@@ -114,9 +114,9 @@ private fun buildNetworkJobs(
 
     val sdkHeaders =
         mapOf(
-            "x-sdk-dispatchid" to dispatchId,
-            "x-sdk-key" to configuration.sdkKey,
-            "x-sdk-implemented-features" to configuration.implementedFeatures.toRawValue().toString(),
+            "X-SDK-DispatchID" to dispatchId,
+            "X-SDK-Key" to configuration.sdkKey,
+            "X-SDK-Implemented-Features" to configuration.implementedFeatures.toRawValue().toString(),
         )
 
     when {
@@ -133,7 +133,6 @@ private fun buildNetworkJobs(
                         payload = if (signalsScope == SignalsScope.FULL) payload else null,
                         vpnEnabled = vpnEnabled,
                         okHttpInterceptors = interceptors,
-                        allowInsecureTLS = configuration.allowInsecureTLS,
                     ),
                 )
             }
@@ -149,7 +148,6 @@ private fun buildNetworkJobs(
                     maxRetries = configuration.maxRetries,
                     vpnEnabled = vpnEnabled,
                     okHttpInterceptors = interceptors,
-                    allowInsecureTLS = configuration.allowInsecureTLS,
                 ),
             )
             if (signalsScope == SignalsScope.FULL) {
@@ -163,7 +161,6 @@ private fun buildNetworkJobs(
                         payload = payload,
                         vpnEnabled = vpnEnabled,
                         okHttpInterceptors = interceptors,
-                        allowInsecureTLS = configuration.allowInsecureTLS,
                     ),
                 )
             }
@@ -180,7 +177,6 @@ private fun buildNetworkJobs(
                     payload = if (signalsScope == SignalsScope.FULL) payload else null,
                     vpnEnabled = vpnEnabled,
                     okHttpInterceptors = interceptors,
-                    allowInsecureTLS = configuration.allowInsecureTLS,
                 ),
             )
         }
@@ -196,7 +192,6 @@ private fun buildNetworkJobs(
                     payload = if (signalsScope == SignalsScope.FULL) payload else null,
                     vpnEnabled = vpnEnabled,
                     okHttpInterceptors = interceptors,
-                    allowInsecureTLS = configuration.allowInsecureTLS,
                 ),
             )
         }
@@ -218,13 +213,12 @@ private fun android.net.Network.requestJob(
     payload: ByteArray? = null,
     vpnEnabled: Boolean,
     okHttpInterceptors: List<Interceptor>,
-    allowInsecureTLS: Boolean,
 ): Deferred<NetworkResponse> =
     scope.async {
         val contentHeaders =
             mapOf(
-                "content-encoding" to "deflate",
-                "content-type" to "application/vnd.prelude.signals",
+                "Content-Encoding" to "deflate",
+                "Content-Type" to "application/vnd.prelude.signals",
             )
         Request(
             url = signalsUrl,
@@ -235,7 +229,6 @@ private fun android.net.Network.requestJob(
             body = payload,
             vpnEnabled = vpnEnabled,
             okHttpInterceptors = okHttpInterceptors,
-            allowInsecureTLS = allowInsecureTLS,
         ).send(this@requestJob)
     }
 

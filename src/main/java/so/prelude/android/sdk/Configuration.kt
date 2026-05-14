@@ -33,10 +33,6 @@ data class Configuration
          * The maximum number of automatic retries for the network requests in case of server errors and timeouts.
          */
         var maxRetries: Int = DEFAULT_MAX_RETRY_COUNT,
-        /**
-         * Bypass TLS certificate and hostname validation. Intended for staging/dev only — never set this in production.
-         */
-        var allowInsecureTLS: Boolean = false,
     ) {
         /**
          * The endpoint address of the Prelude API.

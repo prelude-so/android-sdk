@@ -3,11 +3,12 @@ package so.prelude.android.sdk.request
 import android.net.Network
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
-import okhttp3.ConnectionSpec
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+import okhttp3.ResponseBody
 import okio.IOException
 import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.network.NetworkBoundDns
@@ -21,9 +22,7 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit.MILLISECONDS
-import kotlin.math.min
 import kotlin.math.pow
-import okhttp3.TlsVersion as OkHttpTlsVersion
 
 /**
  * Request is a network HTTP request.
@@ -34,12 +33,6 @@ import okhttp3.TlsVersion as OkHttpTlsVersion
  * @property body The request body content.
  * @property timeout The request connection timeout in milliseconds.
  * @property readTimeout The request read timeout in milliseconds. -1 uses the OkHttp default (10s).
- * @property includeRequestDateHeader Whether to include the X-SDK-Request-Date header.
- * @property maxRetries The maximum number of automatic retries on timeout or server error.
- * @property vpnEnabled Whether the device is connected via VPN.
- * @property followRedirects Whether to follow HTTP redirects.
- * @property okHttpInterceptors Additional OkHttp network interceptors.
-
  */
 internal class Request(
     private val url: URL,
@@ -53,22 +46,30 @@ internal class Request(
     private val vpnEnabled: Boolean,
     private val followRedirects: Boolean = true,
     private val okHttpInterceptors: List<Interceptor> = emptyList(),
-    private val tlsVersions: List<OkHttpTlsVersion>? = null,
-    private val allowInsecureTLS: Boolean = false,
 ) {
     private var cachedClient: Pair<Network, OkHttpClient>? = null
 
     private fun getOrCreateClient(network: Network): OkHttpClient =
         cachedClient?.takeIf { it.first == network }?.second
-            ?: buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors, tlsVersions, allowInsecureTLS).also {
+            ?: buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors).also {
                 cachedClient = Pair(network, it)
             }
 
     suspend fun send(
         network: Network,
-        retryAttempt: Int = 0,
+        retryCount: Int = this.maxRetries,
     ): NetworkResponse =
         try {
+            val requestDelay =
+                if (retryCount == this.maxRetries) {
+                    0L
+                } else {
+                    2.0.pow(this.maxRetries - retryCount - 1).toLong() * 250L
+                }
+            if (requestDelay > 0) {
+                delay(requestDelay)
+            }
+
             val client = getOrCreateClient(network)
 
             val request =
@@ -76,13 +77,11 @@ internal class Request(
                     .Builder()
                     .url(url)
                     .method(method, body?.toRequestBody(null, 0, body.size))
-                    .apply {
-                        header("x-sdk-retry-attempt", retryAttempt.toString())
-                    }.build()
+                    .build()
 
-            when (val result = sendRequest(client, request, retryAttempt)) {
+            when (val result = sendRequest(client, request, retryCount)) {
                 is RequestResult.Ok -> {
-                    Success(fromPayloadRequest = request.body != null, code = result.code, body = result.body)
+                    Success(fromPayloadRequest = request.body != null, code = result.code, body = result.body?.bytes())
                 }
 
                 is RequestResult.Redirect -> {
@@ -90,7 +89,6 @@ internal class Request(
                         fromPayloadRequest = request.body != null,
                         code = result.code,
                         location = result.location,
-                        headers = result.headers,
                     )
                 }
 
@@ -99,9 +97,7 @@ internal class Request(
                 }
 
                 is RequestResult.Retry -> {
-                    val requestDelay = 2.0.pow(retryAttempt).toLong() * 250L
-                    delay(min(requestDelay, 10_000L))
-                    send(network, retryAttempt + 1)
+                    send(network, retryCount - 1)
                 }
             }
         } catch (e: CancellationException) {
@@ -116,8 +112,6 @@ internal class Request(
         timeout: Long,
         usingVpn: Boolean,
         interceptors: List<Interceptor>,
-        tlsVersions: List<OkHttpTlsVersion>? = null,
-        allowInsecureTLS: Boolean = false,
     ): OkHttpClient {
         val clientBuilder =
             OkHttpClient
@@ -132,7 +126,7 @@ internal class Request(
 
                     if (includeRequestDateHeader) {
                         builder.header(
-                            "x-sdk-request-date",
+                            "X-SDK-Request-Date",
                             ZonedDateTime.now(ZoneOffset.UTC).format(DateTimeFormatter.ISO_DATE_TIME),
                         )
                     }
@@ -143,40 +137,6 @@ internal class Request(
 
                     chain.proceed(builder.build())
                 }
-
-        if (allowInsecureTLS) {
-            val trustAll =
-                @Suppress("CustomX509TrustManager")
-                object : javax.net.ssl.X509TrustManager {
-                    override fun checkClientTrusted(
-                        chain: Array<java.security.cert.X509Certificate>,
-                        authType: String,
-                    ) = Unit
-
-                    override fun checkServerTrusted(
-                        chain: Array<java.security.cert.X509Certificate>,
-                        authType: String,
-                    ) = Unit
-
-                    override fun getAcceptedIssuers(): Array<java.security.cert.X509Certificate> = emptyArray()
-                }
-            val sslContext =
-                javax.net.ssl.SSLContext.getInstance("TLS").apply {
-                    init(null, arrayOf(trustAll), java.security.SecureRandom())
-                }
-            clientBuilder
-                .sslSocketFactory(sslContext.socketFactory, trustAll)
-                .hostnameVerifier { _, _ -> true }
-        }
-
-        if (tlsVersions != null) {
-            val spec =
-                ConnectionSpec
-                    .Builder(ConnectionSpec.MODERN_TLS)
-                    .tlsVersions(*tlsVersions.toTypedArray())
-                    .build()
-            clientBuilder.connectionSpecs(listOf(spec, ConnectionSpec.CLEARTEXT))
-        }
 
         interceptors.forEach {
             clientBuilder.addNetworkInterceptor(it)
@@ -194,36 +154,30 @@ internal class Request(
     private fun sendRequest(
         client: OkHttpClient,
         request: Request,
-        currentAttempt: Int,
+        currentRetries: Int,
     ): RequestResult =
         try {
-            client.newCall(request).execute().use { response ->
-                when {
-                    response.isSuccessful -> {
-                        RequestResult.Ok(response.code, response.body?.bytes())
-                    }
+            val response: Response = client.newCall(request).execute()
+            when {
+                response.isSuccessful -> {
+                    RequestResult.Ok(response.code, response.body)
+                }
 
-                    response.isRedirect -> {
-                        response.header("location")?.let { location ->
-                            val quirkHeaders =
-                                response.headers.toMultimap().filter { (key, _) ->
-                                    key.lowercase().startsWith("x-sdk-quirk-")
-                                }
-                            RequestResult.Redirect(response.code, location, quirkHeaders)
-                        } ?: RequestResult.Error(response.code, "Redirect without Location header")
-                    }
+                response.isRedirect -> {
+                    response.header("Location")?.let { RequestResult.Redirect(response.code, it) }
+                        ?: RequestResult.Error(response.code, "Redirect without Location header")
+                }
 
-                    response.code.isInternalServerError() && hasRemainingRetries(currentAttempt) -> {
-                        RequestResult.Retry
-                    }
+                response.code.isInternalServerError() && hasRemainingRetries(currentRetries) -> {
+                    RequestResult.Retry
+                }
 
-                    else -> {
-                        RequestResult.Error(response.code, response.message)
-                    }
+                else -> {
+                    RequestResult.Error(response.code, response.message)
                 }
             }
         } catch (e: SocketTimeoutException) {
-            if (hasRemainingRetries(currentAttempt)) {
+            if (hasRemainingRetries(currentRetries)) {
                 RequestResult.Retry
             } else {
                 RequestResult.Error(message = e.message ?: "SocketTimeoutException", source = e)
@@ -239,7 +193,7 @@ internal class Request(
     private sealed interface RequestResult {
         data class Ok(
             val code: Int,
-            val body: ByteArray?,
+            val body: ResponseBody?,
         ) : RequestResult
 
         data class Error(
@@ -251,7 +205,6 @@ internal class Request(
         data class Redirect(
             val code: Int,
             val location: String,
-            val headers: Map<String, List<String>> = emptyMap(),
         ) : RequestResult
 
         data object Retry : RequestResult
@@ -259,5 +212,5 @@ internal class Request(
 
     private fun Int.isInternalServerError(): Boolean = this in (500..599)
 
-    private fun hasRemainingRetries(attempt: Int): Boolean = attempt < maxRetries
+    private fun hasRemainingRetries(retryCount: Int): Boolean = retryCount > 0
 }

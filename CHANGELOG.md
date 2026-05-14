@@ -2,22 +2,9 @@
 
 Prelude Android SDK Change Log
 
-## [0.5.2] - 2026-05-14
+## [0.4.2] - 2026-05-14
 
 - Fix `dispatchSignals` triggering `StrictMode IncorrectContextUseViolation` on Android 12+ (API 31+) when callers configure `detectIncorrectContextUse()`. With `penaltyDeath()` set this previously killed the process on the first dispatch. Display metrics are now read via `DisplayManager`, which is safe to access from any context, instead of `WindowManager`.
-
-## [0.5.1] - 2026-05-12
-
-- Fix signal dispatch failing when transport detection raced a 50ms requestNetwork callback. Network discovery is now a synchronous snapshot of `ConnectivityManager.allNetworks`, mirroring iOS `NWPathMonitor`.
-- Add `Configuration.allowInsecureTLS` to bypass TLS certificate/hostname validation for staging endpoints (off by default; do not enable in production).
-- Fix runtime `VersionInfo.versionString` (and the User-Agent / signals payload it feeds) drifting from the published Maven coordinates: both are now driven by a single `sdkVersion` constant in `build.gradle.kts`.
-
-## [0.5.0] - 2026-04-17
-
-- Updated core SDK to 0.4.0.
-- Improved Silent Network Authentication per carrier configuration.
-- Strengthen device signals.
-- Improved the signal dispatch algorithm.
 
 ## [0.4.1] - 2026-02-18
 
