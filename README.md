@@ -7,10 +7,10 @@ It is provided as a regular Maven artifact that you can use as a normal dependen
 
 <CodeGroup>
     ```kts Kts
-    implementation("so.prelude.android:sdk:0.5.2")
+    implementation("so.prelude.android:sdk:0.6.0")
     ```
     ```groovy Groovy
-    implementation 'so.prelude.android:sdk:0.5.2'
+    implementation 'so.prelude.android:sdk:0.6.0'
     ```
 </CodeGroup>
 

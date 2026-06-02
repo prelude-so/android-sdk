@@ -18,6 +18,20 @@ import java.security.MessageDigest
 import java.time.Instant
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.math.ln
+import kotlin.math.sqrt
+
+/** Linear (0..1) → perceptual (0..1) using AOSP's HLG curve, matching the Settings slider. */
+private fun linearToGamma(linear: Float): Float {
+    val n = linear.coerceIn(0f, 1f) * 12f
+    val gamma =
+        if (n <= 1f) {
+            sqrt(n) * 0.5f
+        } else {
+            0.17883277f * ln(n - 0.28466892f) + 0.55991073f
+        }
+    return gamma.coerceIn(0f, 1f)
+}
 
 internal fun Device.Companion.collect(context: Context): Device {
     val uname = android.system.Os.uname()
@@ -106,6 +120,20 @@ internal fun Device.Companion.collect(context: Context): Device {
         }
     }
 
+    val screenBrightness: Float? by lazy {
+        // Perceptual [0..1], matching iOS UIScreen.main.brightness and the Settings slider.
+        try {
+            val raw =
+                Settings.System.getInt(
+                    context.contentResolver,
+                    Settings.System.SCREEN_BRIGHTNESS,
+                )
+            linearToGamma(raw.coerceIn(0, 255) / 255f)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     val fontsDigest: String? by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val md = MessageDigest.getInstance("SHA-256")
@@ -186,6 +214,7 @@ internal fun Device.Companion.collect(context: Context): Device {
         simulator,
         null,
         collectAndroidProperties(),
+        screenBrightness,
     )
 }
 

@@ -2,6 +2,11 @@
 
 Prelude Android SDK Change Log
 
+## [0.6.0] - 2026-06-02
+
+- Added collection of the device screen brightness signal.
+- Updated core SDK to 0.4.1; device signal hashing is now revision 4 (includes screen brightness).
+
 ## [0.5.2] - 2026-05-14
 
 - Fix `dispatchSignals` triggering `StrictMode IncorrectContextUseViolation` on Android 12+ (API 31+) when callers configure `detectIncorrectContextUse()`. With `penaltyDeath()` set this previously killed the process on the first dispatch. Display metrics are now read via `DisplayManager`, which is safe to access from any context, instead of `WindowManager`.
