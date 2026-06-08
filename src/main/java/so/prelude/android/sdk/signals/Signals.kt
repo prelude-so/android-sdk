@@ -14,6 +14,7 @@ import so.prelude.android.sdk.Application
 import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.Device
 import so.prelude.android.sdk.Endpoint
+import so.prelude.android.sdk.Features
 import so.prelude.android.sdk.Features.Companion.toRawValue
 import so.prelude.android.sdk.Hardware
 import so.prelude.android.sdk.Network
@@ -140,18 +141,28 @@ private fun buildNetworkJobs(
         }
 
         lanNetwork != null && cellularNetwork != null -> {
-            jobs.add(
-                cellularNetwork.requestJob(
-                    scope = scope,
-                    signalsUrl = signalsUrl,
-                    sdkHeaders = sdkHeaders,
-                    requestTimeout = configuration.requestTimeout,
-                    maxRetries = configuration.maxRetries,
-                    vpnEnabled = vpnEnabled,
-                    okHttpInterceptors = interceptors,
-                    allowInsecureTLS = configuration.allowInsecureTLS,
-                ),
-            )
+            // Cellular OPTIONS fires when either (a) the call IS the OPTIONS
+            // (SILENT_VERIFICATION scope), so skipping it would leave the dispatch
+            // with zero jobs; or (b) the call is FULL and the integration
+            // advertises SNA, in which case the OPTIONS is the carrier-route
+            // fingerprint side-channel. Verify-only FULL dispatches skip it to
+            // avoid a request that can fail silently on weak cellular.
+            if (signalsScope == SignalsScope.SILENT_VERIFICATION ||
+                Features.SilentVerification in configuration.implementedFeatures
+            ) {
+                jobs.add(
+                    cellularNetwork.requestJob(
+                        scope = scope,
+                        signalsUrl = signalsUrl,
+                        sdkHeaders = sdkHeaders,
+                        requestTimeout = configuration.requestTimeout,
+                        maxRetries = configuration.maxRetries,
+                        vpnEnabled = vpnEnabled,
+                        okHttpInterceptors = interceptors,
+                        allowInsecureTLS = configuration.allowInsecureTLS,
+                    ),
+                )
+            }
             if (signalsScope == SignalsScope.FULL) {
                 jobs.add(
                     lanNetwork.requestJob(
@@ -236,6 +247,9 @@ private fun android.net.Network.requestJob(
             vpnEnabled = vpnEnabled,
             okHttpInterceptors = okHttpInterceptors,
             allowInsecureTLS = allowInsecureTLS,
+            // POST (signals payload) rides Android's default network; only
+            // the OPTIONS carrier fingerprint needs to be bound to [network].
+            bindToNetwork = payload == null,
         ).send(this@requestJob)
     }
 

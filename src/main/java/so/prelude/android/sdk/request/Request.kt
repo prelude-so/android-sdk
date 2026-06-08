@@ -39,7 +39,6 @@ import okhttp3.TlsVersion as OkHttpTlsVersion
  * @property vpnEnabled Whether the device is connected via VPN.
  * @property followRedirects Whether to follow HTTP redirects.
  * @property okHttpInterceptors Additional OkHttp network interceptors.
-
  */
 internal class Request(
     private val url: URL,
@@ -55,12 +54,25 @@ internal class Request(
     private val okHttpInterceptors: List<Interceptor> = emptyList(),
     private val tlsVersions: List<OkHttpTlsVersion>? = null,
     private val allowInsecureTLS: Boolean = false,
+    // When false, do not bind the OkHttp socket factory / DNS to [network].
+    // Reserved for SNA: Silent verification and the cellular OPTIONS fingerprint.
+    // The generic signals POST opts out so it can ride Android's default
+    // network, which the OS keeps validated and routes across handles for us.
+    private val bindToNetwork: Boolean = true,
 ) {
     private var cachedClient: Pair<Network, OkHttpClient>? = null
 
     private fun getOrCreateClient(network: Network): OkHttpClient =
         cachedClient?.takeIf { it.first == network }?.second
-            ?: buildOkHttpClient(network, headers, timeout, vpnEnabled, okHttpInterceptors, tlsVersions, allowInsecureTLS).also {
+            ?: buildOkHttpClient(
+                network = network,
+                headers = headers,
+                timeout = timeout,
+                bindToNetwork = bindToNetwork && !vpnEnabled,
+                interceptors = okHttpInterceptors,
+                tlsVersions = tlsVersions,
+                allowInsecureTLS = allowInsecureTLS,
+            ).also {
                 cachedClient = Pair(network, it)
             }
 
@@ -114,7 +126,7 @@ internal class Request(
         network: Network,
         headers: Map<String, String>,
         timeout: Long,
-        usingVpn: Boolean,
+        bindToNetwork: Boolean = true,
         interceptors: List<Interceptor>,
         tlsVersions: List<OkHttpTlsVersion>? = null,
         allowInsecureTLS: Boolean = false,
@@ -182,8 +194,12 @@ internal class Request(
             clientBuilder.addNetworkInterceptor(it)
         }
 
-        // Use the default socket factory for VPN requests, bind to the network for non-VPN requests.
-        if (!usingVpn) {
+        // Bound networking is for SNA: verification must originate from
+        // the carrier route, and the cellular OPTIONS preflight does the same to
+        // give the backend a carrier-route fingerprint. The dispatch POST does
+        // not need either, and binding it to a hand-picked Network handle can be
+        // a source of UnknownHostException on flaky cellular.
+        if (bindToNetwork) {
             clientBuilder.socketFactory(network.socketFactory)
             clientBuilder.dns(NetworkBoundDns(network))
         }
