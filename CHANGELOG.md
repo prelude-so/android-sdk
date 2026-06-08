@@ -2,6 +2,12 @@
 
 Prelude Android SDK Change Log
 
+## [0.6.1] - 2026-06-08
+
+- Fix `dispatchSignals` failing with `UnknownHostException` on unstable cellular connections. The signals payload request now uses the device's default network route; only Silent Network Authentication requests remain bound to the cellular network.
+- Network selection now prefers validated, Internet-capable routes, falling back to transport-only matches on devices that under-report network capabilities.
+- The cellular network request on a full dispatch is now only sent when `Features.SilentVerification` is included in `Configuration.implementedFeatures`.
+
 ## [0.6.0] - 2026-06-02
 
 - Added collection of the device screen brightness signal.

@@ -3,6 +3,8 @@ package so.prelude.android.sdk.network
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
+import android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED
 import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
 import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
@@ -50,6 +52,35 @@ class NetworkStatusTest {
     fun `returns null when no registered network has a matching transport`() {
         val cm = cmWith(active = network(TRANSPORT_CELLULAR))
         assertNull(cm.firstMatching(listOf(TRANSPORT_WIFI, TRANSPORT_ETHERNET)))
+    }
+
+    @Test
+    fun `falls back to transport-only network when no internet-capable match exists`() {
+        val cm = cmWith(active = network(TRANSPORT_WIFI, hasInternet = false))
+        assertSame(cm.activeNetwork, cm.firstMatching(listOf(TRANSPORT_WIFI)))
+    }
+
+    @Test
+    fun `prefers internet-capable network over transport-only match`() {
+        val localOnlyWifi = network(TRANSPORT_WIFI, hasInternet = false)
+        val internetWifi = network(TRANSPORT_WIFI, isValidated = false)
+        val cm = cmWith(active = localOnlyWifi, internetWifi)
+        assertSame(internetWifi.network, cm.firstMatching(listOf(TRANSPORT_WIFI)))
+    }
+
+    @Test
+    fun `prefers validated networks over unvalidated matches`() {
+        val unvalidatedWifi = network(TRANSPORT_WIFI, isValidated = false)
+        val validatedWifi = network(TRANSPORT_WIFI)
+        val cm = cmWith(active = unvalidatedWifi, validatedWifi)
+        assertSame(validatedWifi.network, cm.firstMatching(listOf(TRANSPORT_WIFI)))
+    }
+
+    @Test
+    fun `falls back to internet-capable unvalidated network when no validated match exists`() {
+        val unvalidatedWifi = network(TRANSPORT_WIFI, isValidated = false)
+        val cm = cmWith(active = null, unvalidatedWifi)
+        assertSame(unvalidatedWifi.network, cm.firstMatching(listOf(TRANSPORT_WIFI)))
     }
 
     @Test
@@ -115,13 +146,22 @@ class NetworkStatusTest {
         val caps: NetworkCapabilities,
     )
 
-    private fun network(vararg transports: Int): FakeNetwork {
+    private fun network(
+        vararg transports: Int,
+        hasInternet: Boolean = true,
+        isValidated: Boolean = true,
+    ): FakeNetwork {
         val net = mockk<Network>()
         val caps = mockk<NetworkCapabilities>()
         // Mock every transport bit we ever query so unmatched ones return false.
         for (t in listOf(TRANSPORT_WIFI, TRANSPORT_ETHERNET, TRANSPORT_CELLULAR)) {
             every { caps.hasTransport(t) } returns (t in transports)
         }
+        // NetworkStatus.kt now prefers INTERNET + VALIDATED routes. Defaults are
+        // both-on so existing assertions keep hitting the fast path; the new
+        // assertions opt out via named arguments to exercise the fallback tiers.
+        every { caps.hasCapability(NET_CAPABILITY_INTERNET) } returns hasInternet
+        every { caps.hasCapability(NET_CAPABILITY_VALIDATED) } returns isValidated
         return FakeNetwork(net, caps)
     }
 
