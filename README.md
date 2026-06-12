@@ -5,14 +5,17 @@ The Android SDK allows you to capture certain device signals that will be report
 
 It is provided as a regular Maven artifact that you can use as a normal dependency in your Android application, add it as an implementation dependency:
 
-<CodeGroup>
-    ```kts Kts
-    implementation("so.prelude.android:sdk:0.6.1")
-    ```
-    ```groovy Groovy
-    implementation 'so.prelude.android:sdk:0.6.1'
-    ```
-</CodeGroup>
+**Kotlin DSL**
+
+```kotlin
+implementation("so.prelude.android:sdk:0.6.1")
+```
+
+**Groovy**
+
+```groovy
+implementation 'so.prelude.android:sdk:0.6.1'
+```
 
 To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, you will be able to copy it and it should be stored in a safe location for later use, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use.
 
@@ -20,8 +23,9 @@ To use the SDK you will need the SDK key that you generate in the [Prelude dashb
 
 To capture device signals you just need to configure it with your SDK key and call a single dispatch function:
 
-<CodeGroup>
-```kotlin Kotlin
+**Kotlin**
+
+```kotlin
 coroutineScope.launch {
   val prelude = Prelude(Configuration(context = context, sdkKey = "sdk_XXXXXXXXXXXXXXXX"))
   val dispatchId: String? = prelude.dispatchSignals().getOrNull()
@@ -30,7 +34,9 @@ coroutineScope.launch {
 }
 ```
 
-```java Java
+**Java**
+
+```java
 Prelude prelude = new Prelude(new Configuration(context, "sdk_XXXXXXXXXXXXXXXX"));
 prelude.dispatchSignals((status, dispatchId) -> {
     if (status == DispatchStatusListener.Status.SUCCESS) {
@@ -38,7 +44,6 @@ prelude.dispatchSignals((status, dispatchId) -> {
     }
 });
 ```
-</CodeGroup>
 
 The `dispatchSignals` function will capture the device signals and report them to Prelude. It will return a `dispatchId` string that you should report back to your back-end to enhance the phone number verification process.
 
@@ -62,7 +67,7 @@ If you use minification in your application (i.e. `isMinifyEnabled = true` somew
 
 If you find any Proguard runtime issues, these are the required rules for JNA:
 
-```
+```proguard
 -dontwarn java.awt.*
 -keep class com.sun.jna.** { *; }
 -keep class * implements com.sun.jna.** { *; }
