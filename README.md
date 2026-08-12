@@ -5,27 +5,28 @@ The Android SDK allows you to capture certain device signals that will be report
 
 It is provided as a regular Maven artifact that you can use as a normal dependency in your Android application, add it as an implementation dependency:
 
-**Kotlin DSL**
+<CodeGroup>
+    ```kts Kts
+    implementation("so.prelude.android:sdk:0.6.2")
+    ```
+    ```groovy Groovy
+    implementation 'so.prelude.android:sdk:0.6.2'
+    ```
+</CodeGroup>
 
-```kotlin
-implementation("so.prelude.android:sdk:0.6.1")
-```
+### Requirements
 
-**Groovy**
+- Android minimum SDK **API 26** (Android 8.0)
+- Java **8** source and target compatibility (Kotlin `jvmTarget` 1.8)
 
-```groovy
-implementation 'so.prelude.android:sdk:0.6.1'
-```
-
-To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, you will be able to copy it and it should be stored in a safe location for later use, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use.
+To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, copy it and keep it somewhere you can retrieve it later, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use. The SDK key is a publishable, client-side key that ships inside your app binary, so this is about not losing it — not about keeping it secret.
 
 #### Capturing Signals
 
 To capture device signals you just need to configure it with your SDK key and call a single dispatch function:
 
-**Kotlin**
-
-```kotlin
+<CodeGroup>
+```kotlin Kotlin
 coroutineScope.launch {
   val prelude = Prelude(Configuration(context = context, sdkKey = "sdk_XXXXXXXXXXXXXXXX"))
   val dispatchId: String? = prelude.dispatchSignals().getOrNull()
@@ -34,9 +35,7 @@ coroutineScope.launch {
 }
 ```
 
-**Java**
-
-```java
+```java Java
 Prelude prelude = new Prelude(new Configuration(context, "sdk_XXXXXXXXXXXXXXXX"));
 prelude.dispatchSignals((status, dispatchId) -> {
     if (status == DispatchStatusListener.Status.SUCCESS) {
@@ -44,6 +43,7 @@ prelude.dispatchSignals((status, dispatchId) -> {
     }
 });
 ```
+</CodeGroup>
 
 The `dispatchSignals` function will capture the device signals and report them to Prelude. It will return a `dispatchId` string that you should report back to your back-end to enhance the phone number verification process.
 
@@ -67,7 +67,7 @@ If you use minification in your application (i.e. `isMinifyEnabled = true` somew
 
 If you find any Proguard runtime issues, these are the required rules for JNA:
 
-```proguard
+```
 -dontwarn java.awt.*
 -keep class com.sun.jna.** { *; }
 -keep class * implements com.sun.jna.** { *; }

@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
-val sdkVersion = "0.6.1"
+val sdkVersion = "0.6.2"
 
 android {
     namespace = "so.prelude.android.sdk"
@@ -47,5 +47,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
