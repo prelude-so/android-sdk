@@ -2,6 +2,10 @@
 
 Prelude Android SDK Change Log
 
+## [0.6.2] - 2026-08-11
+
+- Retry a failed host lookup. `UnknownHostException` bypassed the retry ladder that already covered timeouts and server errors, so a single dropped DNS query ended the request.
+
 ## [0.6.1] - 2026-06-08
 
 - Fix `dispatchSignals` failing with `UnknownHostException` on unstable cellular connections. The signals payload request now uses the device's default network route; only Silent Network Authentication requests remain bound to the cellular network.

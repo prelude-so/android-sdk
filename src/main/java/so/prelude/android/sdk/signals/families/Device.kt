@@ -183,7 +183,6 @@ internal fun Device.Companion.collect(context: Context): Device {
                     !Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)
             ) ||
             Build.MANUFACTURER.contains("Genymotion") ||
-            Build.HOST.startsWith("Build") ||
 
             // MSI App Player
             (

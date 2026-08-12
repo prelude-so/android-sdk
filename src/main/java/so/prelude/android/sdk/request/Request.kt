@@ -4,6 +4,7 @@ import android.net.Network
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import okhttp3.ConnectionSpec
+import okhttp3.Dns
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,6 +18,7 @@ import so.prelude.android.sdk.request.NetworkResponse.Success
 import java.net.Proxy
 import java.net.SocketTimeoutException
 import java.net.URL
+import java.net.UnknownHostException
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -35,10 +37,11 @@ import okhttp3.TlsVersion as OkHttpTlsVersion
  * @property timeout The request connection timeout in milliseconds.
  * @property readTimeout The request read timeout in milliseconds. -1 uses the OkHttp default (10s).
  * @property includeRequestDateHeader Whether to include the X-SDK-Request-Date header.
- * @property maxRetries The maximum number of automatic retries on timeout or server error.
+ * @property maxRetries The maximum number of automatic retries on timeout, failed lookup or server error.
  * @property vpnEnabled Whether the device is connected via VPN.
  * @property followRedirects Whether to follow HTTP redirects.
  * @property okHttpInterceptors Additional OkHttp network interceptors.
+ * @property dns The resolver used when the request is not bound to [Network].
  */
 internal class Request(
     private val url: URL,
@@ -59,6 +62,7 @@ internal class Request(
     // The generic signals POST opts out so it can ride Android's default
     // network, which the OS keeps validated and routes across handles for us.
     private val bindToNetwork: Boolean = true,
+    private val dns: Dns = Dns.SYSTEM,
 ) {
     private var cachedClient: Pair<Network, OkHttpClient>? = null
 
@@ -202,6 +206,8 @@ internal class Request(
         if (bindToNetwork) {
             clientBuilder.socketFactory(network.socketFactory)
             clientBuilder.dns(NetworkBoundDns(network))
+        } else {
+            clientBuilder.dns(dns)
         }
 
         return clientBuilder.build()
@@ -238,14 +244,12 @@ internal class Request(
                     }
                 }
             }
-        } catch (e: SocketTimeoutException) {
-            if (hasRemainingRetries(currentAttempt)) {
+        } catch (e: IOException) {
+            if (e.isTransient() && hasRemainingRetries(currentAttempt)) {
                 RequestResult.Retry
             } else {
-                RequestResult.Error(message = e.message ?: "SocketTimeoutException", source = e)
+                RequestResult.Error(message = e.message ?: e.javaClass.simpleName, source = e)
             }
-        } catch (e: IOException) {
-            RequestResult.Error(message = e.message ?: "IOException", source = e)
         } catch (e: IllegalStateException) {
             RequestResult.Error(message = e.message ?: "IllegalStateException", source = e)
         } catch (e: Exception) {
@@ -274,6 +278,12 @@ internal class Request(
     }
 
     private fun Int.isInternalServerError(): Boolean = this in (500..599)
+
+    /**
+     * A read that timed out or a lookup that failed points at the link rather than
+     * the destination, and the next attempt often gets through. Anything else is final.
+     */
+    private fun IOException.isTransient(): Boolean = this is SocketTimeoutException || this is UnknownHostException
 
     private fun hasRemainingRetries(attempt: Int): Boolean = attempt < maxRetries
 }
