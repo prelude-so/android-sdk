@@ -7,10 +7,10 @@ It is provided as a regular Maven artifact that you can use as a normal dependen
 
 <CodeGroup>
     ```kts Kts
-    implementation("so.prelude.android:sdk:0.6.2")
+    implementation("so.prelude.android:sdk:0.6.3")
     ```
     ```groovy Groovy
-    implementation 'so.prelude.android:sdk:0.6.2'
+    implementation 'so.prelude.android:sdk:0.6.3'
     ```
 </CodeGroup>
 
@@ -19,7 +19,7 @@ It is provided as a regular Maven artifact that you can use as a normal dependen
 - Android minimum SDK **API 26** (Android 8.0)
 - Java **8** source and target compatibility (Kotlin `jvmTarget` 1.8)
 
-To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, copy it and keep it somewhere you can retrieve it later, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use. The SDK key is a publishable, client-side key that ships inside your app binary, so this is about not losing it — not about keeping it secret.
+To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, copy it and keep it somewhere you can retrieve it later, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use. The SDK key is a publishable, client-side key that ships inside your app binary, so this is about not losing it, not about keeping it secret.
 
 #### Capturing Signals
 
@@ -45,7 +45,7 @@ prelude.dispatchSignals((status, dispatchId) -> {
 ```
 </CodeGroup>
 
-The `dispatchSignals` function will capture the device signals and report them to Prelude. It will return a `dispatchId` string that you should report back to your back-end to enhance the phone number verification process.
+The `dispatchSignals` function will capture the device signals and report them to Prelude. It will return a `dispatchId` string that you should report back to your back-end and pass to the verification request.
 
 As context it is recommended to pass the application context but you can pass any Android context and the library will resolve the correct one.
 

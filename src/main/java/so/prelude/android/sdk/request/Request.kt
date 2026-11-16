@@ -198,11 +198,8 @@ internal class Request(
             clientBuilder.addNetworkInterceptor(it)
         }
 
-        // Bound networking is for SNA: verification must originate from
-        // the carrier route, and the cellular OPTIONS preflight does the same to
-        // give the backend a carrier-route fingerprint. The dispatch POST does
-        // not need either, and binding it to a hand-picked Network handle can be
-        // a source of UnknownHostException on flaky cellular.
+        // Binding is for SNA and the cellular OPTIONS fingerprint, which must originate on
+        // the carrier route; a pinned handle can fail as UnknownHostException on cellular.
         if (bindToNetwork) {
             clientBuilder.socketFactory(network.socketFactory)
             clientBuilder.dns(NetworkBoundDns(network))

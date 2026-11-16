@@ -2,6 +2,10 @@
 
 Prelude Android SDK Change Log
 
+## [0.6.3] - 2026-11-16
+
+- Silent verification now asks Android to bring up cellular data when the device is on Wi-Fi, as iOS does with `requiredInterfaceType = .cellular`. Before, it only used a cellular network that was already up and failed with "Can not connect to the cellular network." otherwise. The request is held until the verification ends, and the previous lookup remains the fallback.
+
 ## [0.6.2] - 2026-08-11
 
 - Retry a failed host lookup. `UnknownHostException` bypassed the retry ladder that already covered timeouts and server errors, so a single dropped DNS query ended the request.
