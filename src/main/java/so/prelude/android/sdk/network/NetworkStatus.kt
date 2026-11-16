@@ -12,13 +12,13 @@ import android.net.NetworkCapabilities.TRANSPORT_ETHERNET
 import android.net.NetworkCapabilities.TRANSPORT_WIFI
 
 private val LAN_TRANSPORTS = listOf(TRANSPORT_WIFI, TRANSPORT_ETHERNET)
-private val CELLULAR_TRANSPORTS = listOf(TRANSPORT_CELLULAR)
+internal val CELLULAR_TRANSPORTS = listOf(TRANSPORT_CELLULAR)
 
 internal fun Context.getLan(): Network? = connectivityManager().firstMatching(LAN_TRANSPORTS)
 
 internal fun Context.getCellular(): Network? = connectivityManager().firstMatching(CELLULAR_TRANSPORTS)
 
-private fun Context.connectivityManager(): ConnectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+internal fun Context.connectivityManager(): ConnectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
 
 /**
  * Synchronous lookup of a Network matching one of [transports].
