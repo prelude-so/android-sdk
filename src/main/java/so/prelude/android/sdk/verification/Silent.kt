@@ -8,16 +8,18 @@ import kotlinx.serialization.json.Json
 import so.prelude.android.sdk.Configuration
 import so.prelude.android.sdk.Endpoint
 import so.prelude.android.sdk.defaultEndpoint
-import so.prelude.android.sdk.network.getCellular
+import so.prelude.android.sdk.network.requestCellular
 import so.prelude.android.sdk.request.NetworkResponse
 import so.prelude.android.sdk.request.Request
 import so.prelude.android.sdk.request.userAgent
 import java.net.URL
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 import okhttp3.TlsVersion as OkHttpTlsVersion
 
+private const val CELLULAR_ACQUIRE_TIMEOUT_MS = 5_000L
 private const val PER_HOP_TIMEOUT_MS = 5_000L
 private const val MIN_TIMEOUT_MS = 1_000L
 
@@ -31,10 +33,6 @@ internal suspend fun performSilentVerification(
             ?: return Result.failure(VerificationException("Invalid verification URL: missing host"))
 
     val quirks = ProviderQuirks.forURL(url)
-
-    val cellular =
-        configuration.context.getCellular()
-            ?: return Result.failure(VerificationException("Can not connect to the cellular network."))
 
     val baseHeaders =
         mapOf(
@@ -61,85 +59,93 @@ internal suspend fun performSilentVerification(
                 var targetMethod = "GET"
                 val startMark = TimeSource.Monotonic.markNow()
 
-                // Extract server quirks from the first Prelude response (always a redirect).
-                if (isTrustedHost(host, configuration.endpoint)) {
-                    val firstHopTimeout = minOf(PER_HOP_TIMEOUT_MS, timeoutMillis)
-                    val firstRequest =
+                // Half the budget at most, so the fallback lookup and the requests still get their turn.
+                val acquireTimeout = minOf(CELLULAR_ACQUIRE_TIMEOUT_MS, timeoutMillis / 2).milliseconds
+                configuration.context.requestCellular(acquireTimeout).use { lease ->
+                    val cellular =
+                        lease.network
+                            ?: return@withTimeout Result.failure(VerificationException("Can not connect to the cellular network."))
+
+                    // Extract server quirks from the first Prelude response (always a redirect).
+                    if (isTrustedHost(host, configuration.endpoint)) {
+                        val firstHopTimeout = minOf(PER_HOP_TIMEOUT_MS, timeoutMillis)
+                        val firstRequest =
+                            Request(
+                                url = url,
+                                method = "GET",
+                                timeout = firstHopTimeout,
+                                readTimeout = firstHopTimeout,
+                                maxRetries = maxRetries,
+                                headers = baseHeaders,
+                                includeRequestDateHeader = false,
+                                vpnEnabled = false,
+                                followRedirects = false,
+                                okHttpInterceptors = interceptors,
+                                allowInsecureTLS = configuration.allowInsecureTLS,
+                            )
+
+                        when (val firstResponse = firstRequest.send(cellular)) {
+                            is NetworkResponse.Redirect -> {
+                                serverQuirks = ServerQuirks.fromHeaders(firstResponse.headers)
+                                targetUrl =
+                                    resolveUrl(url, firstResponse.location)
+                                        ?: return@withTimeout Result.failure(
+                                            VerificationException("Invalid redirect URL: ${firstResponse.location}"),
+                                        )
+                                targetMethod = redirectMethod(firstResponse.code, "GET")
+                            }
+
+                            else -> {
+                                return@withTimeout Result.failure(
+                                    VerificationException("Unexpected response from verification server"),
+                                )
+                            }
+                        }
+                    }
+
+                    // Main request with quirks applied; OkHttp handles remaining redirects.
+                    val targetHost =
+                        targetUrl.host
+                            ?: return@withTimeout Result.failure(
+                                VerificationException("Invalid redirect URL: missing host"),
+                            )
+                    val quirkHeaders = serverQuirks.headersForHost(targetHost)
+                    val mergedHeaders = baseHeaders + quirkHeaders
+                    val tlsVersion = serverQuirks.tlsVersionForHost(targetHost)
+                    val tlsVersions = tlsVersion?.protocols?.map { OkHttpTlsVersion.forJavaName(it) }
+
+                    val elapsedMs = startMark.elapsedNow().inWholeMilliseconds
+                    val remainingMs = maxOf(timeoutMillis - elapsedMs, MIN_TIMEOUT_MS)
+                    val request =
                         Request(
-                            url = url,
-                            method = "GET",
-                            timeout = firstHopTimeout,
-                            readTimeout = firstHopTimeout,
+                            url = targetUrl,
+                            method = targetMethod,
+                            timeout = remainingMs,
+                            readTimeout = remainingMs,
                             maxRetries = maxRetries,
-                            headers = baseHeaders,
+                            headers = mergedHeaders,
                             includeRequestDateHeader = false,
                             vpnEnabled = false,
-                            followRedirects = false,
+                            followRedirects = true,
                             okHttpInterceptors = interceptors,
+                            tlsVersions = tlsVersions,
                             allowInsecureTLS = configuration.allowInsecureTLS,
                         )
 
-                    when (val firstResponse = firstRequest.send(cellular)) {
+                    when (val response = request.send(cellular)) {
+                        is NetworkResponse.Success -> {
+                            response.body
+                                ?.let { parseResponse(it, json) }
+                                ?: Result.failure(VerificationException("Silent verification response is empty."))
+                        }
+
+                        is NetworkResponse.Error -> {
+                            Result.failure(VerificationException("${response.code}, ${response.message}"))
+                        }
+
                         is NetworkResponse.Redirect -> {
-                            serverQuirks = ServerQuirks.fromHeaders(firstResponse.headers)
-                            targetUrl =
-                                resolveUrl(url, firstResponse.location)
-                                    ?: return@withTimeout Result.failure(
-                                        VerificationException("Invalid redirect URL: ${firstResponse.location}"),
-                                    )
-                            targetMethod = redirectMethod(firstResponse.code, "GET")
+                            Result.failure(VerificationException("Too many redirects"))
                         }
-
-                        else -> {
-                            return@withTimeout Result.failure(
-                                VerificationException("Unexpected response from verification server"),
-                            )
-                        }
-                    }
-                }
-
-                // Main request with quirks applied; OkHttp handles remaining redirects.
-                val targetHost =
-                    targetUrl.host
-                        ?: return@withTimeout Result.failure(
-                            VerificationException("Invalid redirect URL: missing host"),
-                        )
-                val quirkHeaders = serverQuirks.headersForHost(targetHost)
-                val mergedHeaders = baseHeaders + quirkHeaders
-                val tlsVersion = serverQuirks.tlsVersionForHost(targetHost)
-                val tlsVersions = tlsVersion?.protocols?.map { OkHttpTlsVersion.forJavaName(it) }
-
-                val elapsedMs = startMark.elapsedNow().inWholeMilliseconds
-                val remainingMs = maxOf(timeoutMillis - elapsedMs, MIN_TIMEOUT_MS)
-                val request =
-                    Request(
-                        url = targetUrl,
-                        method = targetMethod,
-                        timeout = remainingMs,
-                        readTimeout = remainingMs,
-                        maxRetries = maxRetries,
-                        headers = mergedHeaders,
-                        includeRequestDateHeader = false,
-                        vpnEnabled = false,
-                        followRedirects = true,
-                        okHttpInterceptors = interceptors,
-                        tlsVersions = tlsVersions,
-                        allowInsecureTLS = configuration.allowInsecureTLS,
-                    )
-
-                when (val response = request.send(cellular)) {
-                    is NetworkResponse.Success -> {
-                        response.body
-                            ?.let { parseResponse(it, json) }
-                            ?: Result.failure(VerificationException("Silent verification response is empty."))
-                    }
-
-                    is NetworkResponse.Error -> {
-                        Result.failure(VerificationException("${response.code}, ${response.message}"))
-                    }
-
-                    is NetworkResponse.Redirect -> {
-                        Result.failure(VerificationException("Too many redirects"))
                     }
                 }
             }

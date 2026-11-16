@@ -141,12 +141,9 @@ private fun buildNetworkJobs(
         }
 
         lanNetwork != null && cellularNetwork != null -> {
-            // Cellular OPTIONS fires when either (a) the call IS the OPTIONS
-            // (SILENT_VERIFICATION scope), so skipping it would leave the dispatch
-            // with zero jobs; or (b) the call is FULL and the integration
-            // advertises SNA, in which case the OPTIONS is the carrier-route
-            // fingerprint side-channel. Verify-only FULL dispatches skip it to
-            // avoid a request that can fail silently on weak cellular.
+            // The cellular OPTIONS is the carrier-route fingerprint, so only SNA
+            // integrations send it. A SILENT_VERIFICATION dispatch sends it too: the LAN
+            // job below is FULL-only, so otherwise the dispatch would have zero jobs.
             if (signalsScope == SignalsScope.SILENT_VERIFICATION ||
                 Features.SilentVerification in configuration.implementedFeatures
             ) {
