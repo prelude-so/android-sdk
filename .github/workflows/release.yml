@@ -1,0 +1,103 @@
+name: Tag and release
+
+# When a release lands on main, tag it and publish a GitHub Release whose
+# notes are that version's section of CHANGELOG.md.
+#
+# The version comes from `sdkVersion` in build.gradle.kts. If the tag already
+# exists, nothing happens, so pushes that don't change the version are no-ops.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - build.gradle.kts
+      - CHANGELOG.md
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read SDK version
+        id: version
+        run: |
+          version=$(sed -nE 's/^val sdkVersion = "([^"]+)".*/\1/p' build.gradle.kts)
+          if [ -z "$version" ]; then
+            echo "::error file=build.gradle.kts::Could not find 'val sdkVersion = \"...\"'"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether the tag already exists
+        id: existing
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" > /dev/null; then
+            echo "Tag $TAG already exists; nothing to release."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release notes
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          # Print everything between "## [VERSION]" and the next "## [" heading.
+          changes=$(awk -v v="$VERSION" '
+            index($0, "## [" v "]") == 1 { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md | sed -e '/./,$!d')
+
+          if ! printf '%s' "$changes" | grep -q '[^[:space:]]'; then
+            echo "::error file=CHANGELOG.md::No '## [$VERSION]' section with content found in CHANGELOG.md"
+            exit 1
+          fi
+
+          core=$(sed -nE 's/^prelude-core-sdk = "([^"]+)".*/\1/p' gradle/libs.versions.toml)
+
+          {
+            echo "## What's changed"
+            echo
+            echo "$changes"
+            echo
+            echo "## Installation"
+            echo
+            echo '```kotlin'
+            echo "implementation(\"so.prelude.android:sdk:$VERSION\")"
+            echo '```'
+            echo
+            if [ -n "$core" ]; then
+              echo "Built on Prelude core SDK \`$core\`."
+              echo
+            fi
+            echo "**Full changelog:** [CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/CHANGELOG.md)"
+          } > notes.md
+
+          cat notes.md
+
+      - name: Create tag and GitHub Release
+        if: steps.existing.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$VERSION" \
+            --notes-file notes.md
