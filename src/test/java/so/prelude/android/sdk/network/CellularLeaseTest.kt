@@ -14,6 +14,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkConstructor
+import io.mockk.mockkStatic
 import io.mockk.runs
 import io.mockk.slot
 import io.mockk.unmockkAll
@@ -138,12 +139,26 @@ class CellularLeaseTest {
             verify(exactly = 0) { cm.unregisterNetworkCallback(any<NetworkCallback>()) }
         }
 
+    @Test
+    fun `asks the platform below API 26, where the mobile data switch cannot be read`() =
+        runTest {
+            val broughtUp = mockk<Network>()
+            val cm = cmAnswering { it.onAvailable(broughtUp) }
+
+            val context = contextWith(cm, dataEnabled = false, canReadSwitch = false)
+
+            assertSame(broughtUp, context.requestCellular(1.seconds).network)
+        }
+
     // --- test helpers --------------------------------------------------------
 
     private fun contextWith(
         cm: ConnectivityManager,
         dataEnabled: Boolean,
+        canReadSwitch: Boolean = true,
     ): Context {
+        mockkStatic(::canReadMobileDataSwitch)
+        every { canReadMobileDataSwitch() } returns canReadSwitch
         val telephony = mockk<TelephonyManager>()
         every { telephony.isDataEnabled } returns dataEnabled
         val context = mockk<Context>()

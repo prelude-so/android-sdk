@@ -2,6 +2,20 @@
 
 Prelude Android SDK Change Log
 
+## [0.7.0] - 2026-11-26
+
+- The minimum Android version is now API 24 (Android 7.0), down from API 26. An app with `minSdk` 24 or 25 must turn on core library desugaring, or every dispatch fails on API 24 and 25 devices (the app does not crash):
+
+  ```kotlin
+  android {
+      compileOptions { isCoreLibraryDesugaringEnabled = true }
+  }
+  dependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") }
+  ```
+
+  Apps with `minSdk` 26 or higher need no change. The device name signal is empty on API 24.
+- Updated core SDK to 0.5.2; device signal hashing is now revision 7.
+
 ## [0.6.3] - 2026-11-16
 
 - Silent verification now asks Android to bring up cellular data when the device is on Wi-Fi, as iOS does with `requiredInterfaceType = .cellular`. Before, it only used a cellular network that was already up and failed with "Can not connect to the cellular network." otherwise. The request is held until the verification ends, and the previous lookup remains the fallback.

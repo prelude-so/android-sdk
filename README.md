@@ -7,17 +7,25 @@ It is provided as a regular Maven artifact that you can use as a normal dependen
 
 <CodeGroup>
     ```kts Kts
-    implementation("so.prelude.android:sdk:0.6.3")
+    implementation("so.prelude.android:sdk:0.7.0")
     ```
     ```groovy Groovy
-    implementation 'so.prelude.android:sdk:0.6.3'
+    implementation 'so.prelude.android:sdk:0.7.0'
     ```
 </CodeGroup>
 
 ### Requirements
 
-- Android minimum SDK **API 26** (Android 8.0)
+- Android minimum SDK **API 24** (Android 7.0)
+- An app with `minSdk` 24 or 25 must turn on [core library desugaring](https://developer.android.com/studio/write/java8-support#library-desugaring), or every dispatch fails on API 24 and 25 devices. Apps with `minSdk` 26 or higher need no change.
 - Java **8** source and target compatibility (Kotlin `jvmTarget` 1.8)
+
+```kotlin
+android {
+    compileOptions { isCoreLibraryDesugaringEnabled = true }
+}
+dependencies { coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5") }
+```
 
 To use the SDK you will need the SDK key that you generate in the [Prelude dashboard](https://app.prelude.so/) for your account. When it is created, copy it and keep it somewhere you can retrieve it later, as the dashboard will only show the SDK key once right after it is created. If you lose the key you will need to generate a new one for future use. The SDK key is a publishable, client-side key that ships inside your app binary, so this is about not losing it, not about keeping it secret.
 
