@@ -4,14 +4,14 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
-val sdkVersion = "0.6.3"
+val sdkVersion = "0.7.0"
 
 android {
     namespace = "so.prelude.android.sdk"
     compileSdk = 34
 
     defaultConfig {
-        minSdk = 26
+        minSdk = 24
         buildConfigField("String", "SDK_VERSION", "\"$sdkVersion\"")
     }
 

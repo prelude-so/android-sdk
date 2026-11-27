@@ -7,7 +7,9 @@ import android.net.Network
 import android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET
 import android.net.NetworkCapabilities.TRANSPORT_CELLULAR
 import android.net.NetworkRequest
+import android.os.Build
 import android.telephony.TelephonyManager
+import androidx.annotation.ChecksSdkIntAtLeast
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
@@ -42,8 +44,16 @@ internal suspend fun Context.requestCellular(timeout: Duration): CellularLease {
 }
 
 // False when mobile data is off, there is no SIM, or the device has no telephony.
+// Below API 26 the SDK cannot tell, so it asks the platform anyway.
 private fun Context.mobileDataEnabled(): Boolean =
-    runCatching { getSystemService(TelephonyManager::class.java)?.isDataEnabled }.getOrNull() ?: false
+    if (canReadMobileDataSwitch()) {
+        runCatching { getSystemService(TelephonyManager::class.java)?.isDataEnabled }.getOrNull() ?: false
+    } else {
+        true
+    }
+
+@ChecksSdkIntAtLeast(api = Build.VERSION_CODES.O)
+internal fun canReadMobileDataSwitch(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
 
 /**
  * Asks Android for a cellular network that routes to the Internet, bringing one up

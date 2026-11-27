@@ -75,7 +75,11 @@ internal fun Device.Companion.collect(context: Context): Device {
     }
 
     val name: String? by lazy {
-        Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N_MR1) {
+            Settings.Global.getString(context.contentResolver, Settings.Global.DEVICE_NAME)
+        } else {
+            null
+        }
     }
 
     val localeCurrent: String? by lazy {
